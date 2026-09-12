@@ -7,7 +7,7 @@ A股复盘分析，技术分析版 · 多空信号 · 艾略特波浪 · 短中�
 > 🔒 **隐私默认**：应用**不内置任何持仓**——持仓由使用者自己添加，只留在本机浏览器。
 > 内嵌的 26 只常见标的与三大指数行情属于**公开市场数据**，仅用于离线演示与开箱可用。
 
-🌐 开发者主页：<https://pxbo.com>　·　⭐ GitHub：<https://github.com/fcgood/ashare-review>
+🌐 开发者主页：<https://pxbo.com>　·　⭐ GitHub：<https://github.com/fcgood/agu>
 
 ---
 
