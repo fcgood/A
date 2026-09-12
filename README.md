@@ -14,18 +14,9 @@ A股复盘分析，技术分析版 · 多空信号 · 艾略特波浪 · 短中�
 ## 一、快速开始
 
 ```bash
-git clone https://github.com/pxbo/ashare-review.git
-cd ashare-review
-# 双击 index.html 即可（无需安装、无需后端、无需联网）
-```
+git clone https://github.com/fcgood/a
 
-> ⚠️ `index.html` 与 `echarts.min.js` 必须放在**同一目录**。
-> 首次打开或升级后请按 `Ctrl + F5` 强制刷新。
 
-### 在线体验（GitHub Pages）
-
-把仓库推到 GitHub 后，在 **Settings → Pages** 选择 `main` 分支根目录，
-即可得到一个可直接分享的网址：`https://<你的用户名>.github.io/ashare-review/`
 
 ---
 
