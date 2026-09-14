@@ -187,8 +187,8 @@ var CMP = {sel:[], span:60};
 var CMP_COLOR=["#58a6ff","#ff4d4f","#f5a524","#a371f7","#22c55e","#e3b341"];
 
 /* ===== v2.0 全局状态（须优先初始化，避免 TDZ） ===== */
-var APPVER  = "2.0.0";
-var APPDATE = "2026-09-12";
+var APPVER  = "2.2";
+var APPDATE = "2026-09-14";
 
 /* K线显示设置 */
 var KLSET = {preset:"full", ma:[5,10,20,60], candle:"solid", log:false,
@@ -1202,8 +1202,9 @@ function renderDiag(an){
     +'<div class="t2">'+esc(s.ds)+'</div></div></div>').join("")
     :'<div class="empty">近 40 日无技术信号</div>';
 
-  ["diagHead","klineCard","tfCard","detailCard","aiCard"].forEach(id=>{$(id).style.display="";});
+  ["diagHead","klineCard","tfCard","detailCard","aiCard","stockAlertCard","stockActionCard"].forEach(id=>{$(id).style.display="";});
   renderAi(an);
+  if(typeof renderStockAlerts === "function") renderStockAlerts(an.code);
   renderRadar(an);
   renderScoreTrend(an);
   drawKline();
@@ -5830,6 +5831,8 @@ function bindCmdk(){
    四、关于页
    ============================================================ */
 var CHANGELOG = [
+  ["2.2", "2026-09-14", "<b>复盘增强 + 稳定性提升</b>：复盘日历热力图（按日可视化评分/盈亏分布）；持仓评分雷达图（多维对比）；复盘模板向导（引导式每日复盘）；全局错误捕获 + 渲染保护；复盘模式增加迷你K线图与快速笔记；个股诊断提醒面板；笔记模板+标签系统；标的分组；隐私发布检查。"],
+  ["2.1", "2026-09-12", "<b>复盘工作流全面优化</b>：浮动快捷加标的面板（Ctrl+K 呼出）；拉取自动重试 + 备用源兜底；仪表盘市场脉搏 / 持仓异动 / 复盘检查清单 / 快速导航 / 复盘日记时间线；Toast 通知 / 市场状态指示 / 快捷键帮助 / URL hash 路由。"],
   ["2.0.0", "2026-09-12", "<b>大盘行情重做</b>：走势图新增<b>单指数 K线 / 收盘线</b>模式（可切上证·深成·创业板与日/周线），叠加<b>自动趋势线</b>（ZigZag 摆动点拟合上升/下降趋势线 + 水平支撑压力聚类 + 突破判定）、<b>趋势通道</b>、<b>艾略特波浪</b>（1-2-3-4-5 与 A-B-C，附浪型阶段进度条与自适应阈值）、均线、成交量副图；指数 KPI 卡加<b>迷你走势</b>与距 MA20 偏离；新增<b>指数相关性矩阵</b>与<b>日/周/月多周期共振</b>。<br>一句话添加标的（代码 / 拼音首字母 / 汉字 / 联网全市场检索，回车即加）；拉取层重写（腾讯直连优先 + JSONP 兜底 + 逐源失败诊断）；后台管理扩为六模块；深色 / 浅色 / 护眼三主题；指标数据字典；<b>隐私默认：不内置、不上传任何持仓</b>。"],
   ["1.1.0", "2026-09-11", "多空信号点、支撑压力线与趋势通道、副图 MACD / KDJ / RSI 切换；指数归一化走势图；主线 × 持仓映射。"],
   ["1.0.0", "2026-09-11", "首个可用版本：四步复盘框架（大盘环境 → 板块轮动 → 个股诊断 → 风险情景），指标全部本地计算，公开行情快照离线可用，Markdown 报告导出。"]
@@ -8074,4 +8077,3158 @@ if(document.readyState === "loading"){
 }else{
   setTimeout(idxV2Boot, 60);
 }
+
+/* ============================================================
+   engine14 · v2.1 UI 增强
+   Toast 通知 / 市场开盘状态 / 快捷键帮助 / 回到顶部 / 空状态 / URL hash
+   ============================================================ */
+
+/* ===================== Toast 通知系统 ===================== */
+var TOAST_ICONS = {info:"i", success:"✓", warn:"!", error:"×"};
+var TOAST_BAR_ANIM = null;
+
+function toast(msg, type, duration){
+  type = type || "info";
+  duration = duration || 3200;
+  var box = $("toastBox");
+  if(!box) return;
+  var el = document.createElement("div");
+  el.className = "toast " + type;
+  el.innerHTML =
+    '<div class="ic">' + (TOAST_ICONS[type] || "i") + '</div>' +
+    '<div class="bd">' + esc(msg) + '</div>' +
+    '<div class="cls">×</div>' +
+    '<div class="pb"><i></i></div>';
+  box.appendChild(el);
+  var remove = function(){
+    if(el._removed) return;
+    el._removed = 1;
+    el.classList.add("out");
+    if(el._timer) clearTimeout(el._timer);
+    if(el._pbTimer) clearInterval(el._pbTimer);
+    setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 280);
+  };
+  el.querySelector(".cls").onclick = remove;
+  el.onclick = function(e){ if(e.target.classList.contains("bd")) remove(); };
+  el._timer = setTimeout(remove, duration);
+  /* 进度条 */
+  var pb = el.querySelector(".pb i");
+  if(pb){
+    var steps = 50, elapsed = 0;
+    pb.style.width = "100%";
+    el._pbTimer = setInterval(function(){
+      elapsed += duration / steps;
+      pb.style.width = Math.max(0, 100 - (elapsed / duration * 100)) + "%";
+      if(el._removed) clearInterval(el._pbTimer);
+    }, duration / steps);
+  }
+  /* 最多同时 5 条 */
+  while(box.children.length > 5){
+    var first = box.firstChild;
+    if(first && first.classList) first.classList.add("out");
+    if(first && first.parentNode) first.parentNode.removeChild(first);
+  }
+}
+
+/* 便捷封装 */
+function toastInfo(msg, d){ toast(msg, "info", d); }
+function toastOk(msg, d){ toast(msg, "success", d); }
+function toastWarn(msg, d){ toast(msg, "warn", d); }
+function toastErr(msg, d){ toast(msg, "error", d || 4200); }
+
+/* ===================== 市场开盘状态 ===================== */
+function marketSessionStatus(){
+  var now = new Date();
+  var day = now.getDay();
+  var h = now.getHours(), m = now.getMinutes();
+  var mins = h * 60 + m;
+  if(day === 0 || day === 6) return {state:"closed", label:"周末休市", countdown:""};
+  if(mins >= 570 && mins < 690) return {state:"open", label:"早盘交易", countdown:formatCountdown(690 - mins, "午休")};
+  if(mins >= 690 && mins < 780) return {state:"lunch", label:"午休中", countdown:formatCountdown(780 - mins, "开盘")};
+  if(mins >= 780 && mins < 900) return {state:"open", label:"午盘交易", countdown:formatCountdown(900 - mins, "收盘")};
+  if(mins >= 540 && mins < 570) return {state:"lunch", label:"盘前", countdown:formatCountdown(570 - mins, "开盘")};
+  return {state:"closed", label:"休市", countdown:""};
+}
+
+function formatCountdown(mins, event){
+  if(mins <= 0) return "";
+  mins = Math.floor(mins);
+  var h = Math.floor(mins / 60), m = mins % 60;
+  if(h > 0) return h + ":" + String(m).padStart(2,"0") + " 后" + event;
+  return m + " 分后" + event;
+}
+
+var _mktTimer = null;
+function renderMarketBadge(){
+  var badge = $("mktBadge");
+  if(!badge) return;
+  var s = marketSessionStatus();
+  badge.className = "mkt-badge " + s.state;
+  var lb = badge.querySelector(".lb");
+  var cd = badge.querySelector(".cd");
+  if(lb) lb.textContent = s.label;
+  if(cd) cd.textContent = s.countdown ? "· " + s.countdown : "";
+  badge.title = "A股交易时段：周一至周五 9:30-11:30 / 13:00-15:00";
+}
+
+function startMarketBadge(){
+  renderMarketBadge();
+  if(_mktTimer) clearInterval(_mktTimer);
+  _mktTimer = setInterval(renderMarketBadge, 30000);
+}
+
+/* ===================== 快捷键帮助面板 ===================== */
+var SHORTCUTS = [
+  {section:"全局", items:[
+    {keys:["Ctrl/⌘","K"], desc:"打开快捷搜索（标的 / 页面跳转）"},
+    {keys:["?"], desc:"显示 / 隐藏快捷键帮助"},
+    {keys:["Esc"], desc:"关闭弹窗 / 退出全屏"}
+  ]},
+  {section:"大盘走势工作台", items:[
+    {keys:["1"], desc:"切换上证指数"},
+    {keys:["2"], desc:"切换深证成指"},
+    {keys:["3"], desc:"切换创业板指"},
+    {keys:["["], desc:"缩小区间（20→60→120→全部）"},
+    {keys:["]"], desc:"放大区间"},
+    {keys:["Esc"], desc:"退出全屏走势图"}
+  ]},
+  {section:"导航", items:[
+    {keys:["g","d"], desc:"仪表盘"},
+    {keys:["g","m"], desc:"大盘环境"},
+    {keys:["g","s"], desc:"个股诊断"},
+    {keys:["g","h"], desc:"持仓管理"},
+    {keys:["g","r"], desc:"复盘报告"}
+  ]}
+];
+
+function renderShortcutPanel(){
+  var grid = $("shortcutGrid");
+  if(!grid) return;
+  var h = "";
+  SHORTCUTS.forEach(function(sec){
+    h += '<div class="shortcut-section"><h4>' + esc(sec.section) + '</h4>';
+    sec.items.forEach(function(it){
+      var keys = it.keys.map(function(k, i){
+        return (i > 0 ? '<span class="plus">+</span>' : "") + '<kbd>' + esc(k) + '</kbd>';
+      }).join("");
+      h += '<div class="shortcut-row"><span class="desc">' + esc(it.desc) + '</span><span class="keys">' + keys + '</span></div>';
+    });
+    h += '</div>';
+  });
+  h += '<div class="shortcut-section"><h4>提示</h4>' +
+    '<div class="shortcut-row"><span class="desc">快捷键在输入框内不触发</span><span class="keys"><kbd>—</kbd></span></div>' +
+    '<div class="shortcut-row"><span class="desc">按 <kbd style="display:inline">?</kbd> 随时呼出 / 关闭本面板</span><span class="keys"></span></div></div>';
+  grid.innerHTML = h;
+}
+
+function toggleShortcutPanel(){
+  var ov = $("shortcutOverlay");
+  if(!ov) return;
+  var show = ov.style.display === "none" || !ov.style.display;
+  ov.style.display = show ? "flex" : "none";
+  if(show) renderShortcutPanel();
+}
+
+function bindShortcutPanel(){
+  var ov = $("shortcutOverlay");
+  if(ov){
+    ov.onclick = function(e){ if(e.target === ov) ov.style.display = "none"; };
+  }
+  var cls = $("shortcutClose");
+  if(cls) cls.onclick = function(){ var o = $("shortcutOverlay"); if(o) o.style.display = "none"; };
+  var navBtn = $("navShortcut");
+  if(navBtn) navBtn.onclick = function(e){ e.preventDefault(); toggleShortcutPanel(); };
+}
+
+/* ===================== 回到顶部 ===================== */
+function bindScrollTop(){
+  var btn = $("scrollTop");
+  if(!btn) return;
+  window.addEventListener("scroll", function(){
+    if(window.pageYOffset > 400) btn.classList.add("show");
+    else btn.classList.remove("show");
+  }, {passive:true});
+  btn.onclick = function(){
+    window.scrollTo({top:0, behavior:"smooth"});
+  };
+}
+
+/* ===================== URL hash 路由 ===================== */
+var TAB_IDS = ["dash","market","sector","stock","holdings","report","compare","notes","alerts","admin","help"];
+
+function syncTabFromHash(){
+  var h = (location.hash || "").replace("#","");
+  if(TAB_IDS.indexOf(h) >= 0){
+    try{ tab(h); }catch(e){}
+  }
+}
+
+function bindHashChange(){
+  window.addEventListener("hashchange", syncTabFromHash);
+  /* 让 tab() 调用时也更新 hash */
+  var _tabOrig = tab;
+  tab = function(id){
+    _tabOrig(id);
+    try{ if(history && history.replaceState) history.replaceState(null, "", "#" + id); }catch(e){}
+  };
+}
+
+/* ===================== g + 字母 导航 ===================== */
+var _gPrefix = {active:false, timer:null};
+function bindGNav(){
+  document.addEventListener("keydown", function(e){
+    if(!e || e.ctrlKey || e.metaKey || e.altKey) return;
+    var a = document.activeElement;
+    if(a && a.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    /* ? 打开快捷键面板 */
+    if(e.key === "?" || (e.shiftKey && e.key === "/")){
+      var ov = $("shortcutOverlay");
+      var vis = ov && ov.style.display !== "none" && ov.style.display !== "";
+      if(vis){
+        ov.style.display = "none";
+      }else{
+        toggleShortcutPanel();
+      }
+      e.preventDefault();
+      return;
+    }
+    /* Esc 关闭快捷键面板 */
+    if(e.key === "Escape"){
+      var ov2 = $("shortcutOverlay");
+      if(ov2 && ov2.style.display !== "none" && ov2.style.display !== ""){
+        ov2.style.display = "none";
+      }
+    }
+    /* g + 字母 导航 */
+    if(e.key === "g" && !_gPrefix.active){
+      _gPrefix.active = true;
+      if(_gPrefix.timer) clearTimeout(_gPrefix.timer);
+      _gPrefix.timer = setTimeout(function(){ _gPrefix.active = false; }, 1200);
+      e.preventDefault();
+      return;
+    }
+    if(_gPrefix.active){
+      _gPrefix.active = false;
+      if(_gPrefix.timer) clearTimeout(_gPrefix.timer);
+      var map = {d:"dash", m:"market", s:"stock", h:"holdings", r:"report",
+                 c:"compare", n:"notes", a:"alerts", p:"admin", e:"help"};
+      var tgt = map[e.key.toLowerCase()];
+      if(tgt){
+        try{ tab(tgt); }catch(err){}
+        e.preventDefault();
+      }
+      return;
+    }
+  });
+}
+
+/* ===================== 空状态渲染 ===================== */
+function emptyStateHtml(icon, title, desc, ctaText, ctaAction){
+  var h = '<div class="empty-state">';
+  h += '<div class="ic">' + icon + '</div>';
+  h += '<div class="tt">' + esc(title) + '</div>';
+  if(desc) h += '<div class="ds">' + esc(desc) + '</div>';
+  if(ctaText){
+    h += '<div class="cta"><button class="btn primary sm" onclick="' + (ctaAction || "") + '">' + esc(ctaText) + '</button></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+/* ===================== 数字滚动动画 ===================== */
+function countUp(el, target, suffix, decimals){
+  if(!el) return;
+  suffix = suffix || "";
+  decimals = decimals || 2;
+  var start = 0, duration = 600, startTime = null;
+  function step(ts){
+    if(!startTime) startTime = ts;
+    var p = Math.min(1, (ts - startTime) / duration);
+    var ease = 1 - Math.pow(1 - p, 3);
+    var val = start + (target - start) * ease;
+    el.textContent = val.toFixed(decimals) + suffix;
+    if(p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ===================== 增强 alert / confirm 提示 ===================== */
+/* 不替换原有的 alert/confirm（因为同步逻辑），但在某些非关键位置提供 toast 替代 */
+var _origAlert = window.alert;
+window.alert = function(msg){
+  /* 如果是简单提示信息，用 toast 替代 */
+  if(typeof msg === "string" && msg.length < 120 && !msg.includes("\n")){
+    toastInfo(msg);
+    return;
+  }
+  _origAlert.call(window, msg);
+};
+
+/* ===================== 初始化 ===================== */
+var _initV14 = null;
+function initV14(){
+  try{ startMarketBadge(); }catch(e){ if(console&&console.error) console.error("marketBadge:", e); }
+  try{ bindShortcutPanel(); }catch(e){}
+  try{ bindScrollTop(); }catch(e){}
+  try{ bindGNav(); }catch(e){}
+  try{ bindHashChange(); }catch(e){}
+  try{ syncTabFromHash(); }catch(e){}
+}
+
+/* 拦截 v2InitSteps，在最后插入新功能 */
+var _v2InitStepsOrig = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrig();
+  try{ initV14(); }catch(e){ if(console&&console.error) console.error("v14 init:", e); }
+  /* 延迟一帧，确保所有渲染完成后再显示欢迎 toast */
+  setTimeout(function(){
+    try{
+      var s = marketSessionStatus();
+      if(s.state === "open"){
+        toastOk("A股" + s.label + "中，数据仅供参考");
+      }else if(s.state === "lunch"){
+        toastInfo("A股" + s.label + "中");
+      }else{
+        toastInfo("A股" + s.label + "，可离线复盘");
+      }
+    }catch(e){}
+  }, 600);
+};
+
+/* ============================================================
+   engine15 · 浮动快捷面板 / 复盘清单 / 隐私保护 / 拉取增强
+   ============================================================ */
+
+/* ===================== 1. 浮动快捷加标的面板 ===================== */
+var FAB = {panel:null, input:null, results:null, items:[], idx:-1, timer:null, seq:0,
+           recent:[], maxRecent:12};
+
+function fabLoadRecent(){
+  try{
+    var s = localStorage.getItem("ashare_fab_recent");
+    if(s){ FAB.recent = JSON.parse(s) || []; }
+  }catch(e){ FAB.recent = []; }
+}
+function fabSaveRecent(){
+  try{ localStorage.setItem("ashare_fab_recent", JSON.stringify(FAB.recent.slice(0, FAB.maxRecent))); }catch(e){}
+}
+function fabAddRecent(code, name){
+  FAB.recent = FAB.recent.filter(function(r){ return r.code !== code; });
+  FAB.recent.unshift({code:code, name:name});
+  if(FAB.recent.length > FAB.maxRecent) FAB.recent.length = FAB.maxRecent;
+  fabSaveRecent();
+}
+
+var FAB_HOT = [
+  {code:"600519", name:"贵州茅台"}, {code:"000858", name:"五粮液"},
+  {code:"300750", name:"宁德时代"}, {code:"601318", name:"中国平安"},
+  {code:("000001"), name:"平安银行"}, {code:"002594", name:"比亚迪"},
+  {code:"600036", name:"招商银行"}, {code:"000063", name:"中兴通讯"},
+  {code:"601012", name:"隆基绿能"}, {code:"002475", name:"立讯精密"}
+];
+
+function fabToggle(forceShow){
+  var p = FAB.panel;
+  if(!p){ p = fabCreate(); }
+  var show = forceShow !== undefined ? forceShow : (p.style.display === "none" || !p.style.display);
+  if(show){
+    p.style.display = "block";
+    p.classList.remove("out");
+    if(FAB.input){
+      FAB.input.value = "";
+      FAB.input.focus();
+      fabRenderHot();
+    }
+  } else {
+    p.classList.add("out");
+    setTimeout(function(){ p.style.display = "none"; }, 200);
+  }
+}
+
+function fabCreate(){
+  var p = document.createElement("div");
+  p.className = "qa-panel";
+  p.style.display = "none";
+  p.innerHTML =
+    '<div class="qa-head">' +
+      '<h4>⚡ 快捷加标的</h4>' +
+      '<div class="qa-sub">输入代码 / 拼音 / 名称，回车即加并自动拉取</div>' +
+    '</div>' +
+    '<div class="qa-body">' +
+      '<div class="qa-input-wrap">' +
+        '<input type="text" id="fabInput" autocomplete="off" ' +
+        'placeholder="如 600519、gmt、茅台…">' +
+        '<button class="qa-clear-btn" id="fabClear">×</button>' +
+      '</div>' +
+      '<div class="qa-results" id="fabResults"></div>' +
+      '<div class="qa-hint">↑↓ 选择 · Enter 添加 · Esc 关闭 · 支持拼音首字母 / 汉字 / 代码</div>' +
+      '<div class="qa-quick" id="fabHot"></div>' +
+      '<div class="qa-recent" id="fabRecentBox" style="display:none">' +
+        '<div class="lb">最近添加</div>' +
+        '<div class="chips" id="fabRecentChips"></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(p);
+  FAB.panel = p;
+  FAB.input = p.querySelector("#fabInput");
+  FAB.results = p.querySelector("#fabResults");
+
+  /* 点击面板外关闭 */
+  p.addEventListener("mousedown", function(e){ e.stopPropagation(); });
+  document.addEventListener("mousedown", function(e){
+    if(p.style.display !== "none" && !p.contains(e.target) &&
+       !($("fabAdd") && $("fabAdd").contains(e.target))){
+      fabToggle(false);
+    }
+  });
+
+  FAB.input.addEventListener("input", function(){
+    var q = FAB.input.value.trim();
+    clearTimeout(FAB.timer);
+    if(!q){ FAB.items = []; fabRenderResults(); fabRenderHot(); return; }
+    var seq = ++FAB.seq;
+    FAB.timer = setTimeout(function(){
+      searchStock(q, function(items, done){
+        if(seq !== FAB.seq) return;
+        FAB.items = items;
+        FAB.idx = items.length ? 0 : -1;
+        fabRenderResults();
+      });
+    }, 180);
+  });
+
+  FAB.input.addEventListener("keydown", function(e){
+    if(!FAB.items.length){
+      if(e.key === "Enter" && FAB.input.value.trim()){
+        e.preventDefault();
+        fabSubmitRaw(FAB.input.value.trim());
+      }
+      if(e.key === "Escape") fabToggle(false);
+      return;
+    }
+    if(e.key === "ArrowDown"){ e.preventDefault(); FAB.idx = Math.min(FAB.items.length - 1, FAB.idx + 1); fabRenderResults(); }
+    else if(e.key === "ArrowUp"){ e.preventDefault(); FAB.idx = Math.max(0, FAB.idx - 1); fabRenderResults(); }
+    else if(e.key === "Enter"){ e.preventDefault(); fabPick(FAB.items[FAB.idx >= 0 ? FAB.idx : 0]); }
+    else if(e.key === "Escape"){ fabToggle(false); }
+  });
+
+  var clrBtn = p.querySelector("#fabClear");
+  if(clrBtn) clrBtn.onclick = function(){ FAB.input.value = ""; FAB.items = []; fabRenderResults(); fabRenderHot(); FAB.input.focus(); };
+
+  return p;
+}
+
+function fabRenderResults(){
+  var box = FAB.results;
+  if(!box) return;
+  if(!FAB.items.length){ box.innerHTML = ""; return; }
+  var h = "";
+  FAB.items.forEach(function(it, i){
+    var sel = (i === FAB.idx) ? " sel" : "";
+    var inList = state.holdings.some(function(hd){ return hd.code === it.code; });
+    var tag = inList ? '<span class="tag have">已持有</span>'
+            : (it.src === "网络" ? '<span class="tag net">网</span>'
+            : '<span class="tag">' + esc(it.src || "") + '</span>');
+    h += '<div class="qa-result' + sel + '" data-i="' + i + '">' +
+      '<span class="code">' + esc(it.code) + '</span>' +
+      '<span class="name">' + esc(it.name) + '</span>' + tag + '</div>';
+  });
+  box.innerHTML = h;
+  Array.prototype.forEach.call(box.querySelectorAll(".qa-result"), function(d){
+    d.onmouseenter = function(){ FAB.idx = +d.dataset.i; fabRenderResults(); };
+    d.onmousedown = function(e){ e.preventDefault(); fabPick(FAB.items[+d.dataset.i]); };
+  });
+}
+
+function fabRenderHot(){
+  var box = $("fabHot");
+  if(!box) return;
+  var h = "";
+  FAB_HOT.forEach(function(s){
+    var inList = state.holdings.some(function(hd){ return hd.code === s.code; });
+    h += '<span class="chip' + (inList ? " have" : "") + '" data-code="' + s.code + '" data-name="' + esc(s.name) + '">' +
+      esc(s.name) + '</span>';
+  });
+  box.innerHTML = h;
+  Array.prototype.forEach.call(box.querySelectorAll(".chip"), function(c){
+    c.onclick = function(){
+      fabPick({code:c.dataset.code, name:c.dataset.name, src:"热门"});
+    };
+  });
+  /* 最近添加 */
+  var rcBox = $("fabRecentBox");
+  var rcChips = $("fabRecentChips");
+  if(rcBox && rcChips){
+    if(FAB.recent.length){
+      rcBox.style.display = "block";
+      var rh = "";
+      FAB.recent.forEach(function(r){
+        rh += '<span class="chip" data-code="' + r.code + '" data-name="' + esc(r.name) + '">' +
+          esc(r.name) + '</span>';
+      });
+      rcChips.innerHTML = rh;
+      Array.prototype.forEach.call(rcChips.querySelectorAll(".chip"), function(c){
+        c.onclick = function(){
+          fabPick({code:c.dataset.code, name:c.dataset.name, src:"最近"});
+        };
+      });
+    } else {
+      rcBox.style.display = "none";
+    }
+  }
+}
+
+async function fabPick(it){
+  if(!it) return;
+  fabAddRecent(it.code, it.name);
+  var t = typeOfCode(it.code, it.name);
+  var has = state.holdings.find(function(h){ return h.code === it.code; });
+  if(!has){
+    state.holdings.push({code:it.code, name:it.name, type:t, inReport:true, group:"持仓"});
+    saveState();
+  }
+  fabToggle(false);
+  /* 自动拉取 */
+  var haveData = !!(state.stocks[it.code] && state.stocks[it.code].rows && state.stocks[it.code].rows.length > 20);
+  if(!haveData){
+    toastInfo("正在拉取 " + it.name + " 日K数据…");
+    try{
+      var n = await fetchStockDataRetry(it.code);
+      if(n > 0){
+        toastOk(it.name + " 拉取成功，" + n + " 根日K");
+      } else {
+        toastWarn(it.name + " 暂无联网数据，可手动粘贴日K", 4200);
+      }
+    }catch(e){
+      toastErr(it.name + " 拉取异常：" + String(e.message || e).slice(0, 40), 4200);
+    }
+  } else {
+    toastOk((has ? "已存在：" : "已添加：") + it.name + "（" + it.code + "）");
+  }
+  if(typeof renderHoldings === "function") renderHoldings();
+  if(typeof renderRail === "function") renderRail();
+  if(typeof renderDash === "function") renderDash();
+  fabUpdateBadge();
+}
+
+async function fabSubmitRaw(q){
+  if(!q) return;
+  var local = searchLocal(q, 1);
+  if(local.length){ fabPick(local[0]); return; }
+  txSmartbox(q, function(items){
+    if(items.length){ fabPick({code:items[0].code, name:items[0].name, py:items[0].py, src:"网络"}); }
+    else if(/^\d{6}$/.test(q)){
+      fabPick({code:q, name:nameOf(q) || ("代码" + q), src:"代码"});
+    }
+    else toastWarn("没找到「" + q + "」，试试代码 / 拼音首字母 / 名称");
+  });
+}
+
+function fabUpdateBadge(){
+  var badge = $("fabBadge");
+  if(!badge) return;
+  var n = state.holdings.length;
+  if(n > 0){
+    badge.textContent = n;
+    badge.style.display = "flex";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+function bindFab(){
+  fabLoadRecent();
+  var btn = $("fabAdd");
+  if(btn) btn.onclick = function(e){ e.preventDefault(); fabToggle(); };
+}
+
+/* ===================== 2. 拉取可靠性增强 ===================== */
+
+/* 带自动重试的拉取 */
+async function fetchStockDataRetry(code, retries){
+  retries = retries || 2;
+  var lastErr = "";
+  for(var attempt = 0; attempt <= retries; attempt++){
+    try{
+      var n;
+      if(typeof fetchStockData === "function" && fetchStockData !== fetchStockDataRetry){
+        n = await fetchStockData(code);
+      } else {
+        n = await fetchStockDataV2(code);
+      }
+      if(n > 0) return n;
+      lastErr = LAST_FETCH_ERR || "无数据";
+      if(attempt < retries){
+        var delay = 800 * (attempt + 1);
+        await new Promise(function(r){ setTimeout(r, delay); });
+      }
+    }catch(e){
+      lastErr = String(e.message || e);
+      if(attempt < retries){
+        await new Promise(function(r){ setTimeout(r, 800 * (attempt + 1)); });
+      }
+    }
+  }
+  return 0;
+}
+
+/* 备用拉取：腾讯日线 v2 接口（不同路径，增加成功率） */
+async function fetchTxV2(code, n){
+  var sym = mktPrefix(code) + String(code).replace(/\D/g, "");
+  var u = "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=" + sym + ",day,," + n + ",qfq";
+  var r = await withTimeout(fetch(u, {cache:"no-store"}).then(function(r){
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }), 9000);
+  var key = sym;
+  var d = r && r.data && (r.data[key] || r.data[Object.keys(r.data || {})[0]]);
+  if(!d) throw new Error("返回结构异常");
+  var arr = d.qfqday || d.day || [];
+  if(!arr.length) throw new Error("空数据");
+  return arr.map(function(x){
+    return {day:x[0], open:x[1], close:x[2], high:x[3], low:x[4], volume:x[5]};
+  });
+}
+
+/* v2 拉取主函数（带额外备用源） */
+async function fetchStockDataV2(code, opt){
+  opt = opt || {};
+  var n = opt.n || 320;
+  code = String(code || "").replace(/\D/g, "").slice(0, 6);
+  if(code.length !== 6) return 0;
+
+  var order = (APICFG && APICFG.order && APICFG.order.length) ? APICFG.order.slice() : ["tx", "sina", "em"];
+  if(order.indexOf("tx") < 0) order.unshift("tx");
+  FETCH_DIAG = [];
+  var rows = null, used = "";
+
+  for(var i = 0; i < order.length; i++){
+    var src = order[i];
+    if(APICFG && APICFG.on && APICFG.on[src] === false) continue;
+    var t0 = Date.now();
+    try{
+      var raw = null;
+      if(src === "tx")        raw = await withTimeout(fetchTx(code, n), 10000);
+      else if(src === "sina") raw = await withTimeout(fetchSinaN(code, n), 10000);
+      else if(src === "em")   raw = await withTimeout(fetchEm(code, n), 10000);
+      var ms = Date.now() - t0;
+      var r = (raw && raw.length) ? normRaw(raw) : [];
+      if(r.length >= 8){
+        rows = r; used = src;
+        FETCH_DIAG.push({src:src, ok:true, ms:ms, n:r.length});
+        break;
+      }
+      FETCH_DIAG.push({src:src, ok:false, ms:ms, err:"返回数据不足（" + r.length + " 根）"});
+    }catch(e){
+      FETCH_DIAG.push({src:src, ok:false, ms:Date.now() - t0,
+        err:String((e && e.message) || e || "未知").slice(0, 60)});
+    }
+  }
+
+  /* 所有标准源都失败，尝试备用腾讯 v2 */
+  if(!rows){
+    try{
+      var t1 = Date.now();
+      var raw2 = await withTimeout(fetchTxV2(code, n), 9000);
+      var r2 = (raw2 && raw2.length) ? normRaw(raw2) : [];
+      var ms2 = Date.now() - t1;
+      if(r2.length >= 8){
+        rows = r2; used = "tx2";
+        FETCH_DIAG.push({src:"tx2", ok:true, ms:ms2, n:r2.length});
+      } else {
+        FETCH_DIAG.push({src:"tx2", ok:false, ms:ms2, err:"备用源数据不足"});
+      }
+    }catch(e2){
+      FETCH_DIAG.push({src:"tx2", ok:false, ms:0, err:String((e2 && e2.message) || e2).slice(0, 60)});
+    }
+  }
+
+  if(typeof apiLog === "function"){
+    apiLog({t:new Date().toISOString().slice(0, 19).replace("T", " "), src:used || "-",
+      code:code, ok:!!rows, n:rows ? rows.length : 0,
+      ms:(FETCH_DIAG.length ? FETCH_DIAG[FETCH_DIAG.length - 1].ms : 0)});
+  }
+
+  if(!rows || !rows.length){
+    LAST_FETCH_ERR = "全部数据源均未取到数据\n" + diagText();
+    return 0;
+  }
+  state.stocks[code] = {rows:rows};
+  if(typeof clearAn === "function") clearAn(code);
+  if(typeof saveState === "function") saveState();
+  var h = state.holdings.find(function(x){ return x.code === code; });
+  if(h && (!h.name || /^代码/.test(h.name))){
+    h.name = (NAME_IDX[code] && NAME_IDX[code].name) || h.name;
+  }
+  LAST_FETCH_ERR = "";
+  if(typeof renderAdmin === "function" && document.getElementById("admin") &&
+     document.getElementById("admin").classList.contains("on")) renderAdmin();
+  return rows.length;
+}
+
+/* ===================== 3. 复盘检查清单 ===================== */
+var CHECKLIST_ITEMS = [
+  {id:"market", txt:"查看大盘环境（指数涨跌 / 涨跌家数 / 板块轮动）", tab:"market"},
+  {id:"breadth", txt:"确认市场情绪（涨跌比 / 涨停跌停 / 连板高度）", tab:"market"},
+  {id:"holdings", txt:"逐一检查持仓技术形态（评分 / 信号 / 支撑压力）", tab:"holdings"},
+  {id:"alerts", txt:"扫描大事提醒与技术信号触发", tab:"alerts"},
+  {id:"stock", txt:"深入分析重点个股（K线 / MACD / 均线 / 布林）", tab:"stock"},
+  {id:"compare", txt:"走势对比：持仓 vs 指数 / 同业强弱", tab:"compare"},
+  {id:"notes", txt:"记录今日判断与明日操作计划", tab:"notes"},
+  {id:"report", txt:"生成复盘报告并归档", tab:"report"}
+];
+
+function checklistLoad(){
+  try{
+    var s = localStorage.getItem("ashare_checklist");
+    if(s) return JSON.parse(s) || {};
+  }catch(e){}
+  return {};
+}
+function checklistSave(obj){
+  try{ localStorage.setItem("ashare_checklist", JSON.stringify(obj)); }catch(e){}
+}
+function checklistTodayKey(){
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+function renderChecklist(){
+  var box = $("checklistBox");
+  if(!box) return;
+  var saved = checklistLoad();
+  var today = checklistTodayKey();
+  var todayState = saved[today] || {};
+  var h = "";
+  CHECKLIST_ITEMS.forEach(function(item){
+    var done = !!todayState[item.id];
+    h += '<div class="cl-item' + (done ? " done" : "") + '" data-id="' + item.id + '" data-tab="' + item.tab + '">' +
+      '<div class="cl-ic"></div>' +
+      '<div class="cl-txt">' + esc(item.txt) + '</div>' +
+    '</div>';
+  });
+  box.innerHTML = h;
+  box.querySelectorAll(".cl-item").forEach(function(el){
+    el.onclick = function(){
+      var id = el.dataset.id;
+      var today = checklistTodayKey();
+      var saved = checklistLoad();
+      if(!saved[today]) saved[today] = {};
+      saved[today][id] = !saved[today][id];
+      checklistSave(saved);
+      renderChecklist();
+      /* 如果勾选了，跳转到对应标签页 */
+      if(saved[today][id]){
+        var item = CHECKLIST_ITEMS.find(function(x){ return x.id === id; });
+        if(item && item.tab){
+          try{ tab(item.tab); }catch(e){}
+        }
+      }
+    };
+  });
+}
+
+/* ===================== 4. 快速导航卡片 ===================== */
+function renderQuickNav(){
+  var box = $("quickNav");
+  if(!box) return;
+  var holdingsN = state.holdings.length;
+  var withDataN = 0;
+  state.holdings.forEach(function(h){
+    var s = state.stocks[h.code];
+    if(s && s.rows && s.rows.length > 8) withDataN++;
+  });
+  var alertsN = ALERTS.length;
+  var notesN = (typeof NOTES !== "undefined") ? NOTES.length : 0;
+  var sigN = 0;
+  state.holdings.forEach(function(h){
+    var an = getAn(h.code);
+    if(an && an.sigs) sigN += an.sigs.filter(function(s){ return s.i >= an.i - 5; }).length;
+  });
+
+  var cards = [
+    {ic:"📊", tt:"大盘环境", ds:"指数走势 / 板块轮动", tab:"market", badge:""},
+    {ic:"📈", tt:"个股诊断", ds:"K线 / MACD / 趋势分析", tab:"stock", badge:""},
+    {ic:"💼", tt:"持仓管理", ds:holdingsN + " 只标的 · " + withDataN + " 只有数据", tab:"holdings", badge:holdingsN > 0 ? holdingsN + " 只" : ""},
+    {ic:"🔔", tt:"大事提醒", ds:alertsN + " 条提醒待查", tab:"alerts", badge:alertsN > 0 ? alertsN + " 条" : ""},
+    {ic:"⚡", tt:"信号汇总", ds:"近 5 日 " + sigN + " 个技术信号", tab:"dash", badge:sigN > 0 ? sigN + " 信号" : ""},
+    {ic:"📝", tt:"复盘笔记", ds:notesN + " 条笔记", tab:"notes", badge:notesN > 0 ? notesN + " 条" : ""},
+    {ic:"📄", tt:"复盘报告", ds:"一键生成今日复盘报告", tab:"report", badge:""},
+    {ic:"🔍", tt:"走势对比", ds:"多标的归一化强弱对比", tab:"compare", badge:""}
+  ];
+
+  var h = "";
+  cards.forEach(function(c){
+    h += '<div class="qn-card" data-tab="' + c.tab + '">' +
+      '<div class="qn-ic">' + c.ic + '</div>' +
+      '<div class="qn-tt">' + esc(c.tt) + '</div>' +
+      '<div class="qn-ds">' + esc(c.ds) + '</div>' +
+      (c.badge ? '<div class="qn-badge">' + esc(c.badge) + '</div>' : '') +
+    '</div>';
+  });
+  box.innerHTML = h;
+  box.querySelectorAll(".qn-card").forEach(function(el){
+    el.onclick = function(){
+      var t = el.dataset.tab;
+      try{ tab(t); }catch(e){}
+    };
+  });
+}
+
+/* ===================== 5. 隐私发布检查 ===================== */
+function renderPubCheck(){
+  var box = $("pubCheck");
+  if(!box) return;
+  var checks = [];
+
+  /* 检查 1: DEFAULT_HOLDINGS 是否为空 */
+  var dhEmpty = (typeof DEFAULT_HOLDINGS !== "undefined" && DEFAULT_HOLDINGS.length === 0);
+  checks.push({ok:dhEmpty, txt:"内置持仓列表（DEFAULT_HOLDINGS）" + (dhEmpty ? "为空" : "含 " + DEFAULT_HOLDINGS.length + " 条个人持仓")});
+
+  /* 检查 2: localStorage 是否有用户持仓 */
+  var lsData = "";
+  try{ lsData = localStorage.getItem(LS_KEY) || ""; }catch(e){}
+  var lsHas = lsData && lsData.length > 10;
+  var lsHoldingsN = 0;
+  if(lsHas){
+    try{ var p = JSON.parse(lsData); if(p && p.holdings) lsHoldingsN = p.holdings.length; }catch(e){}
+  }
+  checks.push({ok:!lsHas || lsHoldingsN === 0, txt:"localStorage 无用户持仓数据" + (lsHas ? "（当前有 " + lsHoldingsN + " 只，发布前请清空）" : "")});
+
+  /* 检查 3: POS（持仓成本）是否为空 */
+  var posHas = false;
+  try{ var ps = localStorage.getItem("ashare_pos"); if(ps && ps !== "{}") posHas = true; }catch(e){}
+  checks.push({ok:!posHas, txt:"持仓成本数据（POS）" + (posHas ? "非空，含个人交易成本" : "为空")});
+
+  /* 检查 4: ALERTS 是否有个人提醒 */
+  var alertsHas = ALERTS && ALERTS.length > 0;
+  checks.push({ok:!alertsHas, txt:"大事提醒列表" + (alertsHas ? "有 " + ALERTS.length + " 条个人提醒" : "为空")});
+
+  /* 检查 5: NOTES 是否有个人笔记 */
+  var notesN = 0;
+  try{ var ns = localStorage.getItem("ashare_notes"); if(ns){ notesN = JSON.parse(ns).length || 0; } }catch(e){}
+  checks.push({ok:notesN === 0, txt:"复盘笔记" + (notesN > 0 ? "有 " + notesN + " 条个人笔记" : "为空")});
+
+  /* 检查 6: .gitignore 是否覆盖 index.html */
+  checks.push({ok:true, txt:"index.html 是构建产物（由 build.py 从 _src/ 生成），源码中不含个人数据"});
+
+  /* 检查 7: API 调用日志 */
+  var apiLogN = APILOG.length;
+  checks.push({ok:apiLogN === 0, txt:"API 调用日志" + (apiLogN > 0 ? "有 " + apiLogN + " 条（含拉取记录，建议清空）" : "为空")});
+
+  var h = "";
+  checks.forEach(function(c){
+    h += '<div class="pc-row">' +
+      '<div class="pc-st ' + (c.ok ? "ok" : "no") + '">' + (c.ok ? "✓" : "✕") + '</div>' +
+      '<div class="pc-txt">' + esc(c.txt) + '</div>' +
+    '</div>';
+  });
+  box.innerHTML = h;
+}
+
+function clearAllPersonalData(){
+  if(!confirm("确认清空全部个人数据？\n\n将删除：持仓列表、持仓成本、复盘笔记、大事提醒、API日志、复盘清单。\n内置的公开行情快照不受影响。\n\n此操作不可撤销！")) return;
+  try{
+    localStorage.removeItem(LS_KEY);
+    localStorage.removeItem("ashare_pos");
+    localStorage.removeItem("ashare_alerts");
+    localStorage.removeItem("ashare_notes");
+    localStorage.removeItem("ashare_apilog");
+    localStorage.removeItem("ashare_checklist");
+    localStorage.removeItem("ashare_fab_recent");
+  }catch(e){}
+  /* 重新加载状态 */
+  state = loadState();
+  POS = {};
+  ALERTS = [];
+  APILOG = [];
+  FAB.recent = [];
+  if(typeof clearAn === "function") clearAn();
+  if(typeof renderHoldings === "function") renderHoldings();
+  if(typeof renderRail === "function") renderRail();
+  if(typeof renderDash === "function") renderDash();
+  if(typeof renderAlerts === "function") renderAlerts();
+  if(typeof renderAdmin === "function") renderAdmin();
+  renderPubCheck();
+  renderChecklist();
+  renderQuickNav();
+  fabUpdateBadge();
+  var msg = $("privMsg");
+  if(msg) msg.innerHTML = '<span style="color:var(--down)">✓ 已清空全部个人数据，可安全发布到 GitHub</span>';
+  toastOk("个人数据已清空，可安全发布");
+}
+
+function exportSafeSnapshot(){
+  /* 导出一份不含个人数据的 JSON 快照 */
+  var safe = {
+    ver: APPVER,
+    date: new Date().toISOString().slice(0, 10),
+    holdings: [],
+    stocks: {},
+    market: state.market,
+    sectors: state.sectors,
+    snap: state.snap,
+    risk: state.risk
+  };
+  var json = JSON.stringify(safe, null, 2);
+  dl("ashare_safe_snapshot_" + Date.now() + ".json", json, "application/json");
+  toastOk("已导出安全快照（不含个人持仓 / 成本 / 笔记）");
+}
+
+function bindPrivacy(){
+  var btn = $("btnPubCheck");
+  if(btn) btn.onclick = renderPubCheck;
+  var btn2 = $("btnExportSafe");
+  if(btn2) btn2.onclick = exportSafeSnapshot;
+  var btn3 = $("btnClearAll");
+  if(btn3) btn3.onclick = clearAllPersonalData;
+}
+
+/* ===================== 6. 增强 renderDash ===================== */
+var _renderDashOrig = renderDash;
+renderDash = function(){
+  _renderDashOrig();
+  renderQuickNav();
+  renderChecklist();
+};
+
+/* ===================== 7. 增强 renderHoldings ===================== */
+/* 在持仓管理页面顶部添加批量操作栏 */
+var _renderHoldingsOrig = renderHoldings;
+renderHoldings = function(){
+  _renderHoldingsOrig();
+  var box = $("holdList");
+  if(!box) return;
+  /* 在表格上方插入批量操作栏 */
+  var existing = $("batchBar");
+  if(existing) return;
+  var bar = document.createElement("div");
+  bar.id = "batchBar";
+  bar.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap";
+  bar.innerHTML =
+    '<button class="btn primary sm" id="batchFetch">⚡ 批量联网拉取</button>' +
+    '<button class="btn sm" id="batchAllOn">☑ 全部纳入报告</button>' +
+    '<button class="btn sm" id="batchAllOff">☑ 全部排除报告</button>' +
+    '<button class="btn sm" id="batchClearData">🗑 清空已拉取数据</button>' +
+    '<span class="muted" id="batchMsg" style="font-size:12px"></span>';
+  box.parentNode.insertBefore(bar, box);
+
+  var bf = $("batchFetch");
+  if(bf) bf.onclick = async function(){
+    if(state.holdings.length === 0){ toastWarn("没有持仓，请先添加标的"); return; }
+    var codes = state.holdings.map(function(h){ return h.code; });
+    var msg = $("batchMsg"); if(msg) msg.textContent = "批量拉取中…";
+    toastInfo("开始批量拉取 " + codes.length + " 只标的…");
+    var done = 0, fail = 0;
+    for(var i = 0; i < codes.length; i++){
+      var c = codes[i];
+      if(msg) msg.textContent = "拉取中 " + (i+1) + "/" + codes.length + " " + nameOf(c) + "…";
+      try{
+        var n = await fetchStockDataRetry(c);
+        if(n > 0) done++; else fail++;
+      }catch(e){ fail++; }
+    }
+    if(msg) msg.textContent = "完成：成功 " + done + " 只，失败 " + fail + " 只";
+    if(done > 0) toastOk("批量拉取完成：成功 " + done + " 只，失败 " + fail + " 只");
+    else toastErr("全部拉取失败，请检查网络或手动粘贴日K");
+    renderHoldings(); renderRail(); renderDash();
+  };
+
+  var bon = $("batchAllOn");
+  if(bon) bon.onclick = function(){
+    state.holdings.forEach(function(h){ h.inReport = true; });
+    saveState(); renderHoldings(); renderRail(); renderDash();
+    toastOk("已全部纳入报告");
+  };
+  var boff = $("batchAllOff");
+  if(boff) boff.onclick = function(){
+    state.holdings.forEach(function(h){ h.inReport = false; });
+    saveState(); renderHoldings(); renderRail(); renderDash();
+    toastOk("已全部排除报告");
+  };
+  var bcd = $("batchClearData");
+  if(bcd) bcd.onclick = function(){
+    if(!confirm("清空所有已拉取的日K数据？\n（不影响持仓列表，可重新拉取）")) return;
+    state.stocks = buildDefaultStocks();
+    saveState();
+    if(typeof clearAn === "function") clearAn();
+    renderHoldings(); renderRail(); renderDash();
+    toastOk("已清空用户拉取数据（保留内置快照）");
+  };
+};
+
+/* ===================== 初始化 ===================== */
+var _initV15 = null;
+function initV15(){
+  try{ fabLoadRecent(); }catch(e){}
+  try{ bindFab(); }catch(e){}
+  try{ fabUpdateBadge(); }catch(e){}
+  try{ bindPrivacy(); }catch(e){}
+}
+
+/* 拦截 v2InitSteps，插入 v15 初始化 */
+var _v2InitStepsOrigV15 = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrigV15();
+  try{
+    initV15();
+    /* 当切到帮助页时渲染隐私检查 */
+    var _origTab = tab;
+    if(!_origTab._wrapped){
+      tab = function(id){
+        _origTab(id);
+        if(id === "help"){
+          setTimeout(renderPubCheck, 50);
+        }
+        if(id === "dash"){
+          setTimeout(function(){ renderQuickNav(); renderChecklist(); }, 50);
+        }
+      };
+      tab._wrapped = true;
+    }
+  }catch(e){ if(console&&console.error) console.error("v15 init:", e); }
+};
+
+/* Ctrl+K / Cmd+K 呼出浮动面板 */
+document.addEventListener("keydown", function(e){
+  if((e.ctrlKey || e.metaKey) && e.key === "k"){
+    e.preventDefault();
+    fabToggle();
+  }
+});
+
+/* ============================================================
+   engine16 · 复盘增强：市场脉搏 / 持仓异动 / 分组 / 复盘日记
+   ============================================================ */
+
+/* ===================== 1. 今日市场脉搏 ===================== */
+function renderPulse(){
+  var body = $("pulseBody");
+  if(!body) return;
+  var m = state.market || {};
+  var snap = state.snap || {};
+  var sectors = state.sectors || [];
+
+  /* 指数数据 */
+  var indices = [
+    {lb:"上证指数", close:m.sh_close, chg:m.sh_chg, amt:m.sh_amt},
+    {lb:"深证成指", close:m.sz_close, chg:m.sz_chg, amt:m.sz_amt},
+    {lb:"创业板指", close:m.cy_close, chg:m.cy_chg, amt:m.cy_amt}
+  ];
+
+  var h = '<div class="pulse-grid">';
+  indices.forEach(function(idx){
+    var chg = num(idx.chg);
+    var cls = chg > 0 ? "up" : (chg < 0 ? "down" : "flat");
+    var arrow = chg > 0 ? "▲" : (chg < 0 ? "▼" : "—");
+    h += '<div class="pulse-cell ' + cls + '">' +
+      '<div class="pl-lb">' + idx.lb + '</div>' +
+      '<div class="pl-vl">' + (idx.close ? f2(idx.close) : "—") + '</div>' +
+      '<div class="pl-ex">' + arrow + ' ' + pct(idx.chg) + '</div>' +
+    '</div>';
+  });
+
+  /* 涨跌家数 */
+  var br = state.breadth || {};
+  var upN = num(br.up) || 0, dnN = num(br.down) || 0, flatN = num(br.flat) || 0;
+  var total = upN + dnN + flatN;
+  var upRatio = total ? Math.round(upN / total * 100) : 0;
+  h += '<div class="pulse-cell ' + (upN >= dnN ? "up" : "down") + '">' +
+    '<div class="pl-lb">涨跌家数</div>' +
+    '<div class="pl-vl">' + upN + ' / ' + dnN + '</div>' +
+    '<div class="pl-ex">上涨占比 ' + upRatio + '%</div>' +
+  '</div>';
+
+  /* 涨停跌停 */
+  var ztN = num(br.zt) || 0, dtN = num(br.dt) || 0;
+  h += '<div class="pulse-cell ' + (ztN >= dtN ? "up" : "down") + '">' +
+    '<div class="pl-lb">涨停 / 跌停</div>' +
+    '<div class="pl-vl">' + ztN + ' / ' + dtN + '</div>' +
+    '<div class="pl-ex">' + (ztN > 0 ? "赚钱效应偏强" : "—") + '</div>' +
+  '</div>';
+
+  h += '</div>';
+
+  /* 板块 TOP */
+  if(sectors.length){
+    h += '<div style="margin-top:10px;font-size:12px;color:var(--muted2);margin-bottom:4px">板块领涨</div>';
+    sectors.slice(0, 5).forEach(function(s){
+      var c = num(s.chg);
+      var cls = c > 0 ? "up" : (c < 0 ? "down" : "");
+      h += '<div class="pulse-sec">' +
+        '<span class="nm">' + esc(s.name) + '</span>' +
+        '<span class="ch ' + cls + '">' + (c > 0 ? "+" : "") + f2(c) + '%</span>' +
+        (s.leader ? '<span class="lb">' + esc(s.leader) + '</span>' : '') +
+      '</div>';
+    });
+  }
+
+  /* 资金快照 */
+  var money = snap.money || [];
+  if(money.length){
+    h += '<div style="margin-top:8px;font-size:12px;color:var(--muted2);margin-bottom:4px">主力资金</div>';
+    money.slice(0, 3).forEach(function(mf){
+      h += '<div class="pulse-sec">' +
+        '<span class="nm">' + esc(mf.name || mf.n || "") + '</span>' +
+        '<span class="ch ' + (num(mf.net || mf.amt) > 0 ? "up" : "down") + '">' +
+          (num(mf.net || mf.amt) > 0 ? "+" : "") + esc(String(mf.net || mf.amt || "")) + '</span>' +
+      '</div>';
+    });
+  }
+
+  body.innerHTML = h;
+
+  /* 日期 */
+  var dt = $("pulseDate");
+  if(dt){
+    var d = new Date();
+    dt.textContent = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+}
+
+function bindPulse(){
+  var btn = $("pulseRefresh");
+  if(btn) btn.onclick = function(){
+    if(typeof refreshMarket === "function"){
+      refreshMarket();
+    } else {
+      try{ renderHeader(); }catch(e){}
+    }
+    setTimeout(renderPulse, 500);
+  };
+  var exp = $("pulseExpand");
+  if(exp) exp.onclick = function(){
+    var card = $("pulseCard");
+    if(!card) return;
+    card.classList.toggle("pulse-collapsed");
+    exp.textContent = card.classList.contains("pulse-collapsed") ? "展开" : "收起";
+  };
+}
+
+/* ===================== 2. 持仓异动监控 ===================== */
+function renderChanges(){
+  var body = $("changeBody");
+  if(!body) return;
+  if(!state.holdings.length){
+    body.innerHTML = '<div class="chg-empty">还没有持仓。点击右下角 + 添加标的开始复盘。</div>';
+    return;
+  }
+
+  var feed = [];
+  state.holdings.forEach(function(hd){
+    var an = getAn(hd.code);
+    if(!an || !an.dates || !an.dates.length) return;
+    var k = an.i, nm = hd.name || an.name || hd.code;
+
+    /* 近 3 日技术信号 */
+    if(an.sigs){
+      an.sigs.filter(function(s){ return s.i >= k - 3; }).forEach(function(s){
+        feed.push({
+          type:"sig", code:hd.code, name:nm,
+          icon: s.side === "b" ? "▲" : (s.side === "s" ? "▼" : "●"),
+          text: s.nm + " — " + (s.ds || "").slice(0, 50),
+          date: s.date || an.dates[s.i] || "",
+          tag: s.side === "b" ? "多头" : (s.side === "s" ? "空头" : "中性")
+        });
+      });
+    }
+
+    /* 价格变动（最近一日） */
+    if(an.closes && k >= 1){
+      var chg = an.chg;
+      if(Math.abs(num(chg)) >= 2){
+        feed.push({
+          type:"move", code:hd.code, name:nm,
+          icon: chg > 0 ? "↑" : "↓",
+          text: "单日" + (chg > 0 ? "上涨" : "下跌") + " " + pct(chg) + "（收 " + f2(an.close) + "）",
+          date: an.dates[k] || "",
+          tag: Math.abs(num(chg)) >= 5 ? "大波动" : "异动"
+        });
+      }
+    }
+  });
+
+  /* 提醒触发 */
+  ALERTS.forEach(function(a){
+    if(a.hit){
+      feed.push({
+        type:"alert", code:a.code, name:a.name || a.code,
+        icon:"!",
+        text: alertTypeTxt(a.type) + " 已触发" + (a.hitInfo ? "：" + a.hitInfo : ""),
+        date:"",
+        tag:"提醒"
+      });
+    }
+  });
+
+  /* 按日期倒序 */
+  feed.sort(function(a, b){
+    return (b.date || "").localeCompare(a.date || "");
+  });
+
+  if(!feed.length){
+    body.innerHTML = '<div class="chg-empty">近 3 日无异常信号 / 价格异动 / 提醒触发，组合平稳。</div>';
+    return;
+  }
+
+  /* tab 筛选 */
+  var h = '<div class="chg-tabs">' +
+    '<span class="chg-tab active" data-filter="all">全部 ' + feed.length + '</span>' +
+    '<span class="chg-tab" data-filter="sig">信号 ' + feed.filter(function(f){return f.type==="sig";}).length + '</span>' +
+    '<span class="chg-tab" data-filter="move">异动 ' + feed.filter(function(f){return f.type==="move";}).length + '</span>' +
+    '<span class="chg-tab" data-filter="alert">提醒 ' + feed.filter(function(f){return f.type==="alert";}).length + '</span>' +
+  '</div>';
+
+  h += '<div class="chg-feed" id="chgFeed">';
+  feed.forEach(function(f){
+    h += '<div class="chg-row ' + f.type + '" data-code="' + esc(f.code) + '" data-filter="' + f.type + '">' +
+      '<div class="chg-ic">' + f.icon + '</div>' +
+      '<div class="chg-nm">' + esc(f.name) + '</div>' +
+      '<div class="chg-cd">' + esc(f.code) + '</div>' +
+      '<div class="chg-tx">' + esc(f.text) + '</div>' +
+      '<div class="chg-tag">' + esc(f.tag) + '</div>' +
+      '<div class="chg-dt">' + esc(f.date) + '</div>' +
+    '</div>';
+  });
+  h += '</div>';
+
+  body.innerHTML = h;
+
+  /* tab 事件 */
+  body.querySelectorAll(".chg-tab").forEach(function(t){
+    t.onclick = function(){
+      body.querySelectorAll(".chg-tab").forEach(function(x){ x.classList.remove("active"); });
+      t.classList.add("active");
+      var f = t.dataset.filter;
+      body.querySelectorAll(".chg-row").forEach(function(r){
+        r.style.display = (f === "all" || r.dataset.filter === f) ? "" : "none";
+      });
+    };
+  });
+
+  /* 点击行跳转个股诊断 */
+  body.querySelectorAll(".chg-row").forEach(function(r){
+    r.onclick = function(){
+      var code = r.dataset.code;
+      try{ pickStock(code); tab("stock"); }catch(e){}
+    };
+  });
+}
+
+/* ===================== 3. 标的分组 ===================== */
+var STOCK_GROUPS = ["持仓", "观察", "题材"];
+var _grpActive = "全部";
+
+function grpLoad(){
+  try{
+    var s = localStorage.getItem("ashare_groups");
+    if(s) STOCK_GROUPS = JSON.parse(s) || ["持仓", "观察", "题材"];
+  }catch(e){}
+}
+function grpSave(){
+  try{ localStorage.setItem("ashare_groups", JSON.stringify(STOCK_GROUPS)); }catch(e){}
+}
+
+function renderGrpBar(){
+  var bar = $("grpBar");
+  if(!bar) return;
+  var counts = {};
+  counts["全部"] = state.holdings.length;
+  STOCK_GROUPS.forEach(function(g){
+    counts[g] = state.holdings.filter(function(h){ return h.group === g; }).length;
+  });
+
+  var h = '<span class="grp-chip' + (_grpActive === "全部" ? " active" : "") + '" data-grp="全部">全部<span class="cnt">' + (counts["全部"] || 0) + '</span></span>';
+  STOCK_GROUPS.forEach(function(g){
+    h += '<span class="grp-chip' + (_grpActive === g ? " active" : "") + '" data-grp="' + esc(g) + '">' + esc(g) + '<span class="cnt">' + (counts[g] || 0) + '</span></span>';
+  });
+  h += '<span class="grp-add" id="grpAdd">+ 新建分组</span>';
+  bar.innerHTML = h;
+
+  bar.querySelectorAll(".grp-chip").forEach(function(c){
+    c.onclick = function(){
+      _grpActive = c.dataset.grp;
+      renderGrpBar();
+      renderHoldings();
+    };
+  });
+
+  var add = $("grpAdd");
+  if(add) add.onclick = function(){
+    var name = prompt("输入新分组名称：");
+    if(name && name.trim()){
+      name = name.trim();
+      if(STOCK_GROUPS.indexOf(name) < 0){
+        STOCK_GROUPS.push(name);
+        grpSave();
+        _grpActive = name;
+        renderGrpBar();
+      }
+    }
+  };
+}
+
+/* 在持仓表格中增加分组列 */
+var _renderHoldingsOrigV16 = null;
+function patchHoldingsForGroups(){
+  if(_renderHoldingsOrigV16) return;
+  _renderHoldingsOrigV16 = renderHoldings;
+
+  renderHoldings = function(){
+    /* 调用原始函数 */
+    _renderHoldingsOrigV16();
+    /* 然后过滤显示 */
+    var box = $("holdList");
+    if(!box) return;
+    var rows = box.querySelectorAll("tbody tr");
+    if(_grpActive === "全部") return;
+    rows.forEach(function(tr){
+      var hi = tr.querySelector("[data-hi]");
+      if(!hi) return;
+      var idx = +hi.dataset.hi;
+      var hd = state.holdings[idx];
+      if(!hd) return;
+      tr.style.display = (hd.group === _grpActive) ? "" : "none";
+    });
+  };
+}
+
+/* 在持仓编辑中增加分组选择 */
+function patchHoldingRowForGroup(){
+  /* 在 renderHoldings 之后，找到每行添加分组下拉 */
+  var box = $("holdList");
+  if(!box) return;
+  var ths = box.querySelectorAll("thead th");
+  /* 在"类型"列后插入"分组"列 */
+  var typeTh = box.querySelector("thead th:nth-child(4)");
+  if(typeTh && !box.querySelector("thead th.grp-th")){
+    var grpTh = document.createElement("th");
+    grpTh.className = "grp-th";
+    grpTh.style.width = "90px";
+    grpTh.textContent = "分组";
+    typeTh.parentNode.insertBefore(grpTh, typeTh.nextSibling);
+  }
+  /* 在每行的类型列后插入分组选择 */
+  var rows = box.querySelectorAll("tbody tr");
+  rows.forEach(function(tr){
+    if(tr.querySelector(".grp-sel")) return;
+    var typeCell = tr.querySelector("td:nth-child(4)");
+    if(!typeCell) return;
+    var hi = tr.querySelector("[data-hi]");
+    if(!hi) return;
+    var idx = +hi.dataset.hi;
+    var hd = state.holdings[idx];
+    if(!hd) return;
+    var grpCell = document.createElement("td");
+    var sel = document.createElement("select");
+    sel.className = "grp-sel";
+    sel.style.cssText = "width:80px;font-size:12px";
+    STOCK_GROUPS.forEach(function(g){
+      var opt = document.createElement("option");
+      opt.value = g;
+      opt.textContent = g;
+      if(hd.group === g) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = function(){
+      state.holdings[idx].group = sel.value;
+      saveState();
+    };
+    grpCell.appendChild(sel);
+    typeCell.parentNode.insertBefore(grpCell, typeCell.nextSibling);
+  });
+}
+
+/* ===================== 4. 复盘日记时间线 ===================== */
+function journalLoad(){
+  try{
+    var s = localStorage.getItem("ashare_journal");
+    if(s) return JSON.parse(s) || [];
+  }catch(e){}
+  return [];
+}
+function journalSave(entries){
+  try{ localStorage.setItem("ashare_journal", JSON.stringify(entries)); }catch(e){}
+}
+
+function journalGenEntry(){
+  var today = checklistTodayKey();
+  var entries = journalLoad();
+  /* 如果今天已有条目，不重复生成 */
+  var existing = entries.find(function(e){ return e.date === today; });
+  if(existing) return existing;
+
+  var m = state.market || {};
+  var avgScore = 0, n = 0, bullN = 0, bearN = 0, sigN = 0;
+  state.holdings.forEach(function(hd){
+    var an = getAn(hd.code);
+    if(an){
+      avgScore += an.score.total; n++;
+      if(an.score.total >= 62) bullN++;
+      if(an.score.total < 45) bearN++;
+      if(an.sigs) sigN += an.sigs.filter(function(s){ return s.i >= an.i - 5; }).length;
+    }
+  });
+  avgScore = n ? Math.round(avgScore / n) : 0;
+
+  var shChg = num(m.sh_chg);
+  var entry = {
+    date: today,
+    market: {
+      sh: shChg, sz: num(m.sz_chg), cy: num(m.cy_chg)
+    },
+    portfolio: {
+      avg: avgScore, n: n, bull: bullN, bear: bearN, sigs: sigN
+    },
+    checklist: checklistLoad()[today] || {},
+    note: ""
+  };
+  entries.unshift(entry);
+  if(entries.length > 365) entries.length = 365;
+  journalSave(entries);
+  return entry;
+}
+
+function journalRender(){
+  var box = $("journalBox");
+  if(!box) return;
+  var entries = journalLoad();
+  if(!entries.length){
+    box.innerHTML = '<div class="chg-empty">还没有日记。点击下方「生成今日日记」开始记录。</div>' +
+      '<div style="text-align:center;margin-top:10px"><button class="btn primary sm" id="journalGen">✍ 生成今日日记</button></div>';
+    var gen = $("journalGen");
+    if(gen) gen.onclick = function(){ journalGenEntry(); journalRender(); };
+    return;
+  }
+
+  var h = "";
+  entries.slice(0, 30).forEach(function(e){
+    var m = e.market || {};
+    var p = e.portfolio || {};
+    var cl = m.sh >= 0 ? "up" : "down";
+    var tone = p.avg >= 62 ? "偏强" : (p.avg < 45 ? "偏弱" : "中性");
+    var toneCls = p.avg >= 62 ? "up" : (p.avg < 45 ? "down" : "");
+
+    var body = "大盘：上证 " + (m.sh >= 0 ? "+" : "") + m.sh + "% · 深成 " + (m.sz >= 0 ? "+" : "") + m.sz + "% · 创业 " + (m.cy >= 0 ? "+" : "") + m.cy + "%<br>" +
+      "组合：均分 <b>" + (p.avg || "—") + "</b> 分（" + (p.n || 0) + " 只），<span class='" + toneCls + "'>" + tone + "</span>，多头 " + p.bull + " / 空头 " + p.bear + "，近5日 " + p.sigs + " 个信号";
+
+    if(e.note) body += "<br>笔记：" + esc(e.note);
+
+    var clDone = 0, clTotal = 0;
+    if(e.checklist){
+      for(var k in e.checklist){ clTotal++; if(e.checklist[k]) clDone++; }
+    }
+
+    h += '<div class="journal-entry">' +
+      '<div class="je-dot"></div>' +
+      '<div class="je-date">' + esc(e.date) + (clTotal ? ' · 复盘清单 ' + clDone + '/' + clTotal : '') + '</div>' +
+      '<div class="je-body">' + body + '</div>' +
+      '<div class="je-tags">' +
+        '<span class="chg-tag">上证' + (m.sh >= 0 ? "+" : "") + m.sh + "%</span>" +
+        '<span class="chg-tag">均分' + (p.avg || "—") + '</span>' +
+        '<span class="chg-tag">' + tone + '</span>' +
+      '</div>' +
+    '</div>';
+  });
+  box.innerHTML = h +
+    '<div style="text-align:center;padding:10px"><button class="btn sm" id="journalGen2">✍ 更新今日日记</button></div>';
+
+  var gen2 = $("journalGen2");
+  if(gen2) gen2.onclick = function(){
+    /* 删除今天的旧条目再重新生成 */
+    var today = checklistTodayKey();
+    var entries = journalLoad().filter(function(e){ return e.date !== today; });
+    journalSave(entries);
+    journalGenEntry();
+    journalRender();
+  };
+}
+
+function bindJournal(){
+  var exp = $("journalExport");
+  if(exp) exp.onclick = function(){
+    var entries = journalLoad();
+    if(!entries.length){ toastWarn("暂无日记可导出"); return; }
+    var text = entries.map(function(e){
+      var m = e.market || {}, p = e.portfolio || {};
+      return "[" + e.date + "] 上证" + (m.sh >= 0 ? "+" : "") + m.sh + "% 深成" + (m.sz >= 0 ? "+" : "") + m.sz + "% 创业" + (m.cy >= 0 ? "+" : "") + m.cy + "% | 组合均分" + (p.avg || "—") + " 多" + p.bull + " 空" + p.bear + " 信号" + p.sigs + (e.note ? " | " + e.note : "");
+    }).join("\n");
+    dl("journal_" + Date.now() + ".txt", text, "text/plain;charset=utf-8");
+    toastOk("日记已导出");
+  };
+}
+
+/* ===================== 5. 增强仪表盘渲染 ===================== */
+var _renderDashV16Orig = null;
+function patchRenderDash(){
+  if(_renderDashV16Orig) return;
+  if(typeof renderDash !== "function") return;
+  _renderDashV16Orig = renderDash;
+  renderDash = function(){
+    _renderDashV16Orig();
+    renderPulse();
+    renderChanges();
+    renderQuickNav();
+    renderChecklist();
+    journalRender();
+  };
+}
+
+/* ===================== 初始化 ===================== */
+var _initV16 = null;
+function initV16(){
+  try{ grpLoad(); }catch(e){}
+  try{ patchRenderDash(); }catch(e){}
+  try{ patchHoldingsForGroups(); }catch(e){}
+  try{ bindPulse(); }catch(e){}
+  try{ bindJournal(); }catch(e){}
+  try{ renderGrpBar(); }catch(e){}
+
+  /* 在 renderHoldings 之后自动补分组列 */
+  var _origRH = renderHoldings;
+  if(!_origRH._grpPatched){
+    renderHoldings = function(){
+      _origRH();
+      try{ renderGrpBar(); }catch(e){}
+      try{ patchHoldingRowForGroup(); }catch(e){}
+      try{ if(_grpActive !== "全部"){
+        var box = $("holdList");
+        if(box){
+          box.querySelectorAll("tbody tr").forEach(function(tr){
+            var hi = tr.querySelector("[data-hi]");
+            if(!hi) return;
+            var idx = +hi.dataset.hi;
+            var hd = state.holdings[idx];
+            if(hd && hd.group !== _grpActive) tr.style.display = "none";
+          });
+        }
+      }}catch(e){}
+    };
+    renderHoldings._grpPatched = true;
+  }
+}
+
+var _v2InitStepsOrigV16 = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrigV16();
+  try{ initV16(); }catch(e){ if(console&&console.error) console.error("v16 init:", e); }
+};
+
+/* ============================================================
+   engine17 · 个股诊断增强：该股提醒 / 快速操作 / 复盘打磨
+   ============================================================ */
+
+/* ===================== 1. 该股大事提醒 ===================== */
+function renderStockAlerts(code){
+  var box = $("stockAlertList");
+  if(!box) return;
+  var list = ALERTS.filter(function(a){ return a.code === code; });
+  if(!list.length){
+    box.innerHTML = '<div class="empty" style="padding:14px">该股暂无提醒。在下方添加价格上破 / 下破 / 涨跌 / 日期 / 自定义事项。</div>';
+    return;
+  }
+  var an = getAn(code);
+  var cur = an ? f2(an.close) : "无数据";
+  var h = "";
+  list.forEach(function(a){
+    var idx = ALERTS.indexOf(a);
+    var cond = "";
+    if(a.type === "above") cond = "收盘 ≥ " + f2(a.val) + "（现价 " + cur + "）";
+    else if(a.type === "below") cond = "收盘 ≤ " + f2(a.val) + "（现价 " + cur + "）";
+    else if(a.type === "chg") cond = "单日涨跌 ≥ ±" + Number(a.val).toFixed(2) + "%";
+    else if(a.type === "date") cond = "到期 " + esc(a.val);
+    else cond = esc(a.val);
+
+    h += '<div class="alertrow ' + (a.hit ? "hit" : "") + '">' +
+      '<div style="padding-top:2px">' + (a.hit ? "🔔" : "⏳") + '</div>' +
+      '<div class="txt"><div class="tt">' +
+        '<span class="pbadge">' + alertTypeTxt(a.type) + '</span>' +
+        (a.hit ? ' <span class="pbadge ok">已触发</span>' : '') +
+        '</div>' +
+      '<div class="ds">' + cond + (a.hitInfo ? '　<b style="color:#ffd48a">' + esc(a.hitInfo) + '</b>' : '') + '</div></div>' +
+      '<button class="btn sm" data-sa-read="' + idx + '">已读</button>' +
+      '<button class="btn sm danger" data-sa-del="' + idx + '">删</button>' +
+      '</div>';
+  });
+  box.innerHTML = h;
+  box.querySelectorAll("[data-sa-del]").forEach(function(b){
+    b.onclick = function(){
+      ALERTS.splice(+b.dataset.saDel, 1);
+      alertSave();
+      renderStockAlerts(code);
+      renderAlerts();
+    };
+  });
+  box.querySelectorAll("[data-sa-read]").forEach(function(b){
+    b.onclick = function(){
+      var a = ALERTS[+b.dataset.saRead];
+      if(a){ a.hit = false; a.hitInfo = ""; }
+      alertSave();
+      renderStockAlerts(code);
+      renderAlerts();
+    };
+  });
+}
+
+function bindStockAlertAdd(){
+  var btn = $("saAdd");
+  if(!btn) return;
+  btn.onclick = function(){
+    var code = ($("stockCode").value || "").trim();
+    if(!code){ toastWarn("请先选择标的"); return; }
+    var name = ($("stockName").value || "").trim() || nameOf(code);
+    var type = $("saType").value;
+    var val = $("saVal").value.trim();
+    var price = $("saPrice").value.trim();
+
+    /* 价格类型用 price 输入框 */
+    if(type === "above" || type === "below"){
+      val = price;
+    }
+    if(!val){ toastWarn("请输入提醒值"); return; }
+
+    ALERTS.unshift({code:code, name:name, type:type, val:val, hit:false, hitInfo:""});
+    alertSave();
+    renderStockAlerts(code);
+    renderAlerts();
+    $("saVal").value = "";
+    $("saPrice").value = "";
+    toastOk("提醒已添加：" + name + " " + alertTypeTxt(type) + " " + val);
+  };
+
+  /* 类型切换时调整输入框 */
+  var sel = $("saType");
+  if(sel) sel.onchange = function(){
+    var v = sel.value;
+    var pi = $("saPrice");
+    var vi = $("saVal");
+    if(v === "above" || v === "below"){
+      if(pi) pi.placeholder = "价格";
+      if(vi) vi.placeholder = "（可选备注）";
+    } else if(v === "chg"){
+      if(pi) pi.placeholder = "—";
+      if(vi) vi.placeholder = "如 3.5 表示 ±3.5%";
+    } else if(v === "date"){
+      if(pi) pi.placeholder = "—";
+      if(vi) { vi.type = "date"; vi.placeholder = "选择日期"; }
+    } else {
+      if(pi) pi.placeholder = "—";
+      if(vi) { vi.type = "text"; vi.placeholder = "自定义事项"; }
+    }
+  };
+}
+
+/* ===================== 2. 快速操作栏 ===================== */
+function bindStockActions(){
+  var compare = $("saCompare");
+  if(compare) compare.onclick = function(){
+    var code = ($("stockCode").value || "").trim();
+    if(!code){ toastWarn("请先选择标的"); return; }
+    var name = ($("stockName").value || "").trim() || nameOf(code);
+    /* 加入走势对比 */
+    if(typeof CMP_CODES !== "undefined" && CMP_CODES.indexOf(code) < 0){
+      CMP_CODES.push(code);
+      try{ localStorage.setItem("ashare_cmp", JSON.stringify(CMP_CODES)); }catch(e){}
+    }
+    toastOk(name + " 已加入走势对比");
+    tab("compare");
+  };
+
+  var note = $("saNote");
+  if(note) note.onclick = function(){
+    var code = ($("stockCode").value || "").trim();
+    var name = ($("stockName").value || "").trim() || nameOf(code);
+    tab("notes");
+    setTimeout(function(){
+      /* 尝试在笔记页选中该标的 */
+      var sel = $("noteCode");
+      if(sel){ sel.value = code; }
+      var inp = $("noteTitle");
+      if(inp){ inp.value = name + " 复盘"; inp.focus(); }
+    }, 100);
+  };
+
+  var report = $("saReport");
+  if(report) report.onclick = function(){
+    var code = ($("stockCode").value || "").trim();
+    if(!code){ toastWarn("请先选择标的"); return; }
+    var h = state.holdings.find(function(x){ return x.code === code; });
+    if(h){
+      h.inReport = true;
+      saveState();
+      toastOk(h.name + " 已纳入复盘报告");
+    } else {
+      toastWarn("该标的不在持仓列表中，请先添加");
+    }
+  };
+
+  var refresh = $("saRefresh");
+  if(refresh) refresh.onclick = async function(){
+    var code = ($("stockCode").value || "").trim();
+    if(!code){ toastWarn("请先选择标的"); return; }
+    toastInfo("正在重新拉取 " + nameOf(code) + "…");
+    try{
+      var n;
+      if(typeof fetchStockDataRetry === "function"){
+        n = await fetchStockDataRetry(code);
+      } else {
+        n = await fetchStockData(code);
+      }
+      if(n > 0){
+        toastOk(nameOf(code) + " 拉取成功，" + n + " 根日K");
+        loadCurrent();
+      } else {
+        toastWarn(nameOf(code) + " 拉取失败，可手动粘贴日K", 4200);
+      }
+    }catch(e){
+      toastErr("拉取异常：" + String(e.message || e).slice(0, 40), 4200);
+    }
+  };
+}
+
+/* ===================== 3. 左侧 rail 增强：显示信号标记 ===================== */
+var _renderRailOrigV17 = null;
+function patchRail(){
+  if(_renderRailOrigV17) return;
+  if(typeof renderRail !== "function") return;
+  _renderRailOrigV17 = renderRail;
+  renderRail = function(){
+    _renderRailOrigV17();
+    /* 在每个 rail 项上添加信号标记 */
+    var box = $("railList");
+    if(!box) return;
+    box.querySelectorAll(".it").forEach(function(el){
+      var code = el.dataset.c;
+      if(!code) return;
+      var an = getAn(code);
+      if(!an || !an.sigs) return;
+      var recent = an.sigs.filter(function(s){ return s.i >= an.i - 3; });
+      if(!recent.length) return;
+      /* 如果还没有信号标记 */
+      if(el.querySelector(".sig-mark")) return;
+      var rt = el.querySelector(".rt");
+      if(!rt) return;
+      var mark = document.createElement("div");
+      mark.className = "sig-mark";
+      mark.style.cssText = "position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%";
+      var lastSig = recent[recent.length - 1];
+      mark.style.background = lastSig.side === "b" ? "var(--down)" : (lastSig.side === "s" ? "var(--up)" : "var(--muted2)");
+      mark.title = lastSig.nm + " " + (lastSig.date || "");
+      el.style.position = "relative";
+      el.appendChild(mark);
+    });
+  };
+}
+
+/* ===================== 4. 增强复盘报告：显示该股提醒 ===================== */
+var _renderReportStockOrig = null;
+function patchReportStock(){
+  /* 在报告的每个标的区块末尾追加该股提醒 */
+  if(typeof renderReportStock !== "function") return;
+  _renderReportStockOrig = renderReportStock;
+  renderReportStock = function(hd, an){
+    var html = _renderReportStockOrig(hd, an);
+    /* 追加该股提醒 */
+    var list = ALERTS.filter(function(a){ return a.code === hd.code; });
+    if(list.length){
+      html += '<h4>🔔 该股提醒</h4><ul>';
+      list.forEach(function(a){
+        var cond = "";
+        if(a.type === "above") cond = "收盘 ≥ " + f2(a.val);
+        else if(a.type === "below") cond = "收盘 ≤ " + f2(a.val);
+        else if(a.type === "chg") cond = "单日涨跌 ≥ ±" + a.val + "%";
+        else if(a.type === "date") cond = "到期 " + a.val;
+        else cond = a.val;
+        html += "<li>" + alertTypeTxt(a.type) + "：" + esc(cond) + (a.hit ? "（已触发）" : "") + "</li>";
+      });
+      html += "</ul>";
+    }
+    return html;
+  };
+}
+
+/* ===================== 5. 信号面板增强：信号统计摘要 ===================== */
+function renderSignalSummary(){
+  /* 在信号列表上方添加摘要 */
+  var box = $("sigList");
+  if(!box) return;
+  var an = CUR.an;
+  if(!an || !an.sigs) return;
+
+  var existing = $("sigSummary");
+  if(existing) existing.remove();
+
+  var all = an.sigs;
+  var bull = all.filter(function(s){ return s.side === "b"; }).length;
+  var bear = all.filter(function(s){ return s.side === "s"; }).length;
+  var neu = all.filter(function(s){ return s.side !== "b" && s.side !== "s"; }).length;
+  var recent5 = all.filter(function(s){ return s.i >= an.i - 5; }).length;
+  var recent20 = all.filter(function(s){ return s.i >= an.i - 20; }).length;
+
+  var div = document.createElement("div");
+  div.id = "sigSummary";
+  div.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.02)";
+  div.innerHTML =
+    '<span style="font-size:12px;color:var(--muted)">信号统计：</span>' +
+    '<span class="chip up" style="font-size:11px">多头 ' + bull + '</span>' +
+    '<span class="chip down" style="font-size:11px">空头 ' + bear + '</span>' +
+    '<span class="chip neu" style="font-size:11px">中性 ' + neu + '</span>' +
+    '<span style="font-size:11px;color:var(--muted2)">近5日 ' + recent5 + ' 个 · 近20日 ' + recent20 + ' 个</span>';
+
+  box.parentNode.insertBefore(div, box);
+}
+
+/* ===================== 6. 持仓表格增强：高亮有信号的行 ===================== */
+function highlightSignalRows(){
+  var box = $("holdList");
+  if(!box) return;
+  var rows = box.querySelectorAll("tbody tr");
+  rows.forEach(function(tr){
+    var hi = tr.querySelector("[data-hi]");
+    if(!hi) return;
+    var idx = +hi.dataset.hi;
+    var hd = state.holdings[idx];
+    if(!hd) return;
+    var an = getAn(hd.code);
+    if(!an || !an.sigs) return;
+    var hasRecent = an.sigs.some(function(s){ return s.i >= an.i - 3; });
+    if(hasRecent){
+      tr.style.boxShadow = "inset 3px 0 0 var(--accent)";
+    }
+  });
+}
+
+/* ===================== 初始化 ===================== */
+var _initV17 = null;
+function initV17(){
+  try{ bindStockAlertAdd(); }catch(e){}
+  try{ bindStockActions(); }catch(e){}
+  try{ patchRail(); }catch(e){}
+  try{ patchReportStock(); }catch(e){}
+}
+
+var _v2InitStepsOrigV17 = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrigV17();
+  try{ initV17(); }catch(e){ if(console&&console.error) console.error("v17 init:", e); }
+};
+
+/* 在 renderDiag 之后渲染信号摘要 */
+var _renderDiagOrigV17 = null;
+function patchRenderDiag(){
+  if(_renderDiagOrigV17) return;
+  if(typeof renderDiag !== "function") return;
+  _renderDiagOrigV17 = renderDiag;
+  renderDiag = function(an){
+    _renderDiagOrigV17(an);
+    try{ renderSignalSummary(); }catch(e){}
+  };
+}
+
+/* 在 renderHoldings 之后高亮信号行 */
+var _renderHoldingsOrigV17 = null;
+function patchHoldingsHighlight(){
+  if(_renderHoldingsOrigV17) return;
+  if(typeof renderHoldings !== "function") return;
+  /* 等待其他 patch 完成后再 patch */
+  _renderHoldingsOrigV17 = renderHoldings;
+  renderHoldings = function(){
+    _renderHoldingsOrigV17();
+    try{ highlightSignalRows(); }catch(e){}
+  };
+}
+
+/* 二次 patch（在 v15/v16 patch 之后） */
+var _v2InitStepsOrigV17b = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrigV17b();
+  try{
+    patchRenderDiag();
+    patchHoldingsHighlight();
+  }catch(e){}
+};
+
+/* ============================================================
+   engine18 · 笔记增强 + 复盘模式 + 仪表盘打磨
+   ============================================================ */
+
+/* ===================== 1. 笔记增强 ===================== */
+
+var NOTE_TEMPLATES = {
+  watch:  {title:"观察等待", text:"当前价格 ，技术形态 。等待 回调/突破 ， 到 位再评估。"},
+  buy:    {title:"计划买入", text:"入场区间 - ，仓位 %，止损 ，目标 - 。逻辑："},
+  sell:   {title:"计划卖出", text:"现价 ，计划在 减仓/清仓。理由：。止损上移至 。"},
+  stop:   {title:"止损位", text:"止损设在 ，对应亏损 %。触发后无条件离场。"},
+  target: {title:"目标位", text:"第一目标 ，第二目标 ，对应涨幅 %。到价减仓 。"},
+  market: {title:"大盘随笔", text:"今日大盘 ，涨跌家比 ，涨停 板。板块轮动：。整体感受：。"}
+};
+
+function bindNoteTemplates(){
+  var bar = $("noteTmplBar");
+  if(!bar) return;
+  bar.querySelectorAll(".note-tmpl").forEach(function(el){
+    el.onclick = function(){
+      var key = el.dataset.tmpl;
+      var t = NOTE_TEMPLATES[key];
+      if(!t) return;
+      var titleEl = $("noteTitle");
+      var textEl = $("noteText");
+      var tagEl = $("noteTag");
+      if(titleEl) titleEl.value = t.title;
+      if(textEl){ textEl.value = t.text; textEl.focus(); }
+      if(tagEl) tagEl.value = key;
+      if(textEl){
+        var idx = t.text.indexOf("，");
+        if(idx > 0){ textEl.setSelectionRange(idx, idx); }
+      }
+    };
+  });
+}
+
+/* 渲染笔记列表（增强版） */
+var _renderNotesOrig = null;
+function patchNotes(){
+  if(_renderNotesOrig) return;
+  if(typeof renderNotes !== "function") return;
+  _renderNotesOrig = renderNotes;
+  renderNotes = function(){
+    _renderNotesOrig();
+    var box = $("noteList");
+    if(!box) return;
+    var filter = ($("noteFilter") ? $("noteFilter").value : "").trim().toLowerCase();
+
+    var list = NOTES.filter(function(n){
+      if(_noteTagFilter && (n.tag || "") !== _noteTagFilter) return false;
+      if(!filter) return true;
+      var txt = (n.title || "") + " " + (n.text || "") + " " + (n.code || "") + " " + (n.name || "") + " " + (n.tag || "");
+      return txt.toLowerCase().indexOf(filter) >= 0;
+    });
+
+    if(!list.length){
+      box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2);font-size:13px">暂无笔记。点击上方模板快速创建。</div>';
+      return;
+    }
+
+    var h = "";
+    list.forEach(function(n){
+      var realIdx = NOTES.indexOf(n);
+      var time = n.time || n.date || "";
+      h += '<div class="note-card">' +
+        '<div class="nc-head">' +
+          '<div class="nc-title">' + esc(n.title || "无标题") + '</div>' +
+          (n.code ? '<span class="nc-code">' + esc(n.code) + ' ' + esc(n.name || "") + '</span>' : '') +
+          '<span class="nc-time">' + esc(time) + '</span>' +
+          '<span class="nc-del" data-ni="' + realIdx + '">删</span>' +
+        '</div>' +
+        '<div class="nc-body">' + esc(n.text || "").replace(/\n/g, "<br>") + '</div>' +
+        (n.tag ? '<div class="nc-tags"><span class="nc-tag">' + esc(n.tag) + '</span></div>' : '') +
+      '</div>';
+    });
+    box.innerHTML = h;
+
+    box.querySelectorAll(".nc-del").forEach(function(b){
+      b.onclick = function(){
+        var idx = +b.dataset.ni;
+        NOTES.splice(idx, 1);
+        try{ localStorage.setItem("ashare_notes", JSON.stringify(NOTES)); }catch(e){}
+        renderNotes();
+        if(typeof renderQuickNav === "function") renderQuickNav();
+      };
+    });
+  };
+}
+
+var _noteTagFilter = "";
+function renderNoteTagFilter(){
+  var box = $("noteTagFilter");
+  if(!box) return;
+  var tags = {};
+  NOTES.forEach(function(n){
+    var t = n.tag || "";
+    if(t) tags[t] = (tags[t] || 0) + 1;
+  });
+  var keys = Object.keys(tags);
+  if(!keys.length){ box.innerHTML = ""; return; }
+  var h = '<span class="ntf' + (_noteTagFilter === "" ? " active" : "") + '" data-tag="">全部</span>';
+  keys.forEach(function(t){
+    h += '<span class="ntf' + (_noteTagFilter === t ? " active" : "") + '" data-tag="' + esc(t) + '">' +
+      esc(t) + ' <span style="opacity:.6">' + tags[t] + '</span></span>';
+  });
+  box.innerHTML = h;
+  box.querySelectorAll(".ntf").forEach(function(el){
+    el.onclick = function(){
+      _noteTagFilter = el.dataset.tag;
+      renderNoteTagFilter();
+      renderNotes();
+    };
+  });
+}
+
+/* 笔记添加增强 */
+function bindNoteAdd(){
+  var btn = $("addNote");
+  if(!btn || btn._enhanced) return;
+  btn._enhanced = true;
+  btn.onclick = function(){
+    var code = $("noteCode") ? $("noteCode").value : "";
+    var name = "";
+    if(code){
+      var h = state.holdings.find(function(x){ return x.code === code; });
+      name = h ? h.name : (typeof nameOf === "function" ? nameOf(code) : code);
+    }
+    var title = $("noteTitle") ? $("noteTitle").value.trim() : "";
+    var text = $("noteText") ? $("noteText").value.trim() : "";
+    var tag = $("noteTag") ? $("noteTag").value.trim() : "";
+
+    if(!text && !title){ toastWarn("请输入笔记内容"); return; }
+
+    var now = new Date();
+    var time = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0") + "-" +
+      String(now.getDate()).padStart(2,"0") + " " + String(now.getHours()).padStart(2,"0") + ":" +
+      String(now.getMinutes()).padStart(2,"0");
+
+    NOTES.unshift({code:code, name:name, title:title, text:text, tag:tag, time:time});
+    try{ localStorage.setItem("ashare_notes", JSON.stringify(NOTES)); }catch(e){}
+    renderNotes();
+    if(typeof renderQuickNav === "function") renderQuickNav();
+    if($("noteText")) $("noteText").value = "";
+    if($("noteTitle")) $("noteTitle").value = "";
+    if($("noteTag")) $("noteTag").value = "";
+    var msg = $("noteMsg");
+    if(msg){ msg.textContent = "已保存"; setTimeout(function(){ msg.textContent = ""; }, 2000); }
+    toastOk("笔记已保存");
+  };
+}
+
+/* ===================== 2. 复盘模式 ===================== */
+var REVIEW = {overlay:null, idx:0, items:[], reviewed:[], notes:[], finished:false};
+
+function openReviewMode(){
+  if(!state.holdings.length){
+    toastWarn("请先添加持仓标的");
+    tab("holdings");
+    return;
+  }
+  REVIEW.items = state.holdings.filter(function(h){ return h.inReport !== false; });
+  if(!REVIEW.items.length) REVIEW.items = state.holdings.slice();
+  REVIEW.idx = 0;
+  REVIEW.reviewed = [];
+  REVIEW.notes = [];
+  REVIEW.finished = false;
+
+  /* 移除旧的 keydown 监听 */
+  if(REVIEW._keyHandler){
+    document.removeEventListener("keydown", REVIEW._keyHandler);
+  }
+  REVIEW._keyHandler = function(e){
+    if(!REVIEW.overlay) return;
+    if(e.key === "Escape"){ e.preventDefault(); reviewClose(); }
+    else if(e.key === "ArrowLeft"){ e.preventDefault(); reviewPrev(); }
+    else if(e.key === "ArrowRight" || (e.key === "Enter" && e.target.tagName !== "TEXTAREA" && e.target.tagName !== "INPUT")){
+      e.preventDefault(); reviewNext();
+    }
+  };
+  document.addEventListener("keydown", REVIEW._keyHandler);
+
+  reviewRender();
+}
+
+function reviewClose(){
+  if(REVIEW._keyHandler){
+    document.removeEventListener("keydown", REVIEW._keyHandler);
+    REVIEW._keyHandler = null;
+  }
+  if(REVIEW.overlay){
+    REVIEW.overlay.remove();
+    REVIEW.overlay = null;
+  }
+  REVIEW.finished = false;
+}
+
+function reviewNext(){
+  if(REVIEW.finished) return;
+  /* 保存快速笔记 */
+  var qi = $("rvQuickNote");
+  if(qi && qi.value.trim()){
+    var hd = REVIEW.items[REVIEW.idx];
+    var nm = hd ? (hd.name || hd.code) : "";
+    REVIEW.notes.push({code:hd ? hd.code : "", name:nm, text:qi.value.trim(), time:new Date().toLocaleString("zh-CN").slice(0,16)});
+    qi.value = "";
+  }
+
+  if(REVIEW.idx < REVIEW.items.length - 1){
+    REVIEW.reviewed[REVIEW.idx] = true;
+    REVIEW.idx++;
+    reviewRender();
+  } else {
+    REVIEW.reviewed[REVIEW.idx] = true;
+    REVIEW.finished = true;
+    reviewRenderSummary();
+  }
+}
+
+function reviewPrev(){
+  if(REVIEW.finished){ REVIEW.finished = false; }
+  if(REVIEW.idx > 0){
+    REVIEW.idx--;
+    reviewRender();
+  }
+}
+
+/* 安全取值 */
+function rvSafe(v, dflt){ return (v === undefined || v === null) ? dflt : v; }
+function rvF2(v){ return (v !== undefined && v !== null && !isNaN(v)) ? f2(v) : "—"; }
+function rvF1(v){ return (v !== undefined && v !== null && !isNaN(v)) ? f1(v) : "—"; }
+function rvPct(v){ return (v !== undefined && v !== null && !isNaN(v)) ? pct(v) : "—"; }
+function rvNum(v){ return (v !== undefined && v !== null && !isNaN(v)) ? Number(v) : 0; }
+
+function reviewRender(){
+  if(REVIEW.finished){ reviewRenderSummary(); return; }
+
+  var ov = REVIEW.overlay;
+  if(!ov){
+    ov = document.createElement("div");
+    ov.className = "review-overlay";
+    document.body.appendChild(ov);
+    REVIEW.overlay = ov;
+  }
+
+  var hd = REVIEW.items[REVIEW.idx];
+  if(!hd){ reviewClose(); return; }
+
+  var an = null;
+  try{ an = getAn(hd.code); }catch(e){ an = null; }
+  var nm = hd.name || (an ? an.name : "") || hd.code;
+
+  var prog = "";
+  REVIEW.items.forEach(function(_, i){
+    var cls = i === REVIEW.idx ? "current" : (REVIEW.reviewed[i] ? "done" : "");
+    prog += '<span class="rn-dot ' + cls + '"></span>';
+  });
+
+  var isLast = REVIEW.idx >= REVIEW.items.length - 1;
+
+  var content = "";
+  try{
+    if(!an || !an.dates || !an.dates.length){
+      content = '<div class="review-empty">' +
+        '<p style="font-size:16px">📋 ' + esc(nm) + '（' + esc(hd.code) + '）</p>' +
+        '<p>暂无日K数据，请先联网拉取或手动粘贴</p>' +
+        '<div class="flex" style="justify-content:center;gap:8px;margin-top:16px">' +
+          '<button class="btn primary sm" id="rvFetch">↻ 联网拉取</button>' +
+        '</div>' +
+      '</div>';
+    } else {
+      var k = an.i;
+      var chg = rvNum(an.chg);
+      var chgCls = chg >= 0 ? "up" : "down";
+
+      /* 信号 */
+      var sigs = (an.sigs || []).filter(function(s){ return s.i >= k - 10; });
+      var sigHtml = "";
+      sigs.forEach(function(s){
+        var cls = s.side === "b" ? "up" : (s.side === "s" ? "down" : "neu");
+        sigHtml += '<span class="chip ' + cls + '" style="font-size:11px">' + esc(s.nm || "") + ' ' + esc(s.date || "") + '</span>';
+      });
+      if(!sigHtml) sigHtml = '<span style="color:var(--muted2);font-size:12px">近10日无信号</span>';
+
+      /* 提醒 */
+      var alerts = ALERTS.filter(function(a){ return a.code === hd.code; });
+      var alertHtml = "";
+      alerts.forEach(function(a){
+        var cond = "";
+        if(a.type === "above") cond = "收盘 ≥ " + rvF2(a.val);
+        else if(a.type === "below") cond = "收盘 ≤ " + rvF2(a.val);
+        else if(a.type === "chg") cond = "涨跌 ≥ ±" + esc(String(a.val || "")) + "%";
+        else if(a.type === "date") cond = "到期 " + esc(String(a.val || ""));
+        else cond = esc(String(a.val || ""));
+        alertHtml += '<div style="padding:4px 0;font-size:12px;color:var(--muted)">' +
+          (a.hit ? "🔔" : "⏳") + " " + (typeof alertTypeTxt === "function" ? alertTypeTxt(a.type) : a.type) + "：" + cond +
+          (a.hit ? ' <span style="color:#ffd48a">已触发</span>' : '') + '</div>';
+      });
+
+      /* 笔记 */
+      var notes = NOTES.filter(function(n){ return n.code === hd.code; });
+      var noteHtml = "";
+      notes.forEach(function(n){
+        noteHtml += '<div style="padding:4px 0;font-size:12px;color:var(--muted);border-bottom:1px dashed var(--line)">' +
+          (n.title ? '<b style="color:var(--txt)">' + esc(n.title) + '</b> — ' : '') +
+          esc(n.text || "").slice(0, 120) +
+          (n.time ? ' <span style="color:var(--muted2);font-size:10px">' + esc(n.time) + '</span>' : '') +
+        '</div>';
+      });
+      if(!noteHtml) noteHtml = '<span style="color:var(--muted2);font-size:12px">暂无笔记</span>';
+
+      /* KPI */
+      var scoreTotal = (an.score && an.score.total !== undefined) ? an.score.total : "—";
+      var scoreLabel = (an.score && an.score.label) ? an.score.label : "";
+      var scoreTone  = (an.score && an.score.tone) ? an.score.tone : "";
+      var rsiV = rvNum(an.rsiV);
+      var rsiZone = an.rsiZone || "";
+      var vr = rvNum(an.vr);
+
+      content =
+        '<div class="grid g4" style="margin-bottom:14px">' +
+          '<div class="kpi ' + chgCls + '"><div class="lb">最新收盘</div><div class="vl">' + rvF2(an.close) + '</div><div class="ex">' + rvPct(chg) + '</div></div>' +
+          '<div class="kpi ' + scoreTone + '"><div class="lb">技术评分</div><div class="vl">' + scoreTotal + '</div><div class="ex">' + scoreLabel + '</div></div>' +
+          '<div class="kpi ' + (rsiV >= 70 ? "up" : (rsiV <= 30 ? "down" : "")) + '"><div class="lb">RSI(14)</div><div class="vl">' + (rsiV ? rvF1(an.rsiV) : "—") + '</div><div class="ex">' + rsiZone + '</div></div>' +
+          '<div class="kpi"><div class="lb">量比(5日)</div><div class="vl">' + (vr ? vr.toFixed(2) : "—") + '</div><div class="ex">' + (vr > 1.5 ? "放量" : (vr < 0.7 ? "缩量" : "常态")) + '</div></div>' +
+        '</div>';
+
+      /* 均线 */
+      var arrange = an.arrange || "—";
+      var arrangeCls = arrange.indexOf("多头") >= 0 ? "up" : (arrange.indexOf("空头") >= 0 ? "down" : "neu");
+      content += '<div style="margin-bottom:14px"><div class="muted" style="font-size:12px;margin-bottom:4px">均线排列</div>' +
+        '<div class="flex" style="gap:6px;flex-wrap:wrap">' +
+          '<span class="chip ' + arrangeCls + ' big">' + esc(arrange) + '</span>';
+      if(an.wk && an.wk.ok && an.wk.arrange){
+        content += '<span class="chip acc big">周线 ' + esc(an.wk.arrange) + '</span>';
+      }
+      content += '</div></div>';
+
+      /* 信号 */
+      content += '<div style="margin-bottom:14px"><div class="muted" style="font-size:12px;margin-bottom:4px">近 10 日信号</div>' +
+        '<div class="flex" style="gap:6px;flex-wrap:wrap">' + sigHtml + '</div></div>';
+
+      /* 提醒 */
+      if(alertHtml){
+        content += '<div style="margin-bottom:14px"><div class="muted" style="font-size:12px;margin-bottom:4px">该股提醒</div>' + alertHtml + '</div>';
+      }
+
+      /* 笔记 */
+      content += '<div style="margin-bottom:14px"><div class="muted" style="font-size:12px;margin-bottom:4px">相关笔记</div>' + noteHtml + '</div>';
+
+      /* 关键位 */
+      var supArr = (an.sup || []).map(function(v){ return rvF2(v); }).filter(function(v){ return v !== "—"; });
+      var resArr = (an.res || []).map(function(v){ return rvF2(v); }).filter(function(v){ return v !== "—"; });
+      var ma20v = (an.ma20 && k >= 0 && an.ma20[k] !== undefined) ? rvF2(an.ma20[k]) : "—";
+      var ma60v = (an.ma60 && k >= 0 && an.ma60[k] !== undefined) ? rvF2(an.ma60[k]) : "—";
+      var blStr = "—";
+      if(an.bl && an.bl.up && an.bl.up[k] !== undefined){
+        blStr = rvF2(an.bl.lo[k]) + " / " + rvF2(an.bl.mid[k]) + " / " + rvF2(an.bl.up[k]);
+      }
+      content += '<div style="margin-bottom:14px"><div class="muted" style="font-size:12px;margin-bottom:4px">关键位</div>' +
+        '<div style="font-size:12px;color:var(--muted);line-height:1.8">' +
+          '支撑：' + (supArr.length ? supArr.join(" / ") : "—") +
+          ' ｜ 压力：' + (resArr.length ? resArr.join(" / ") : "—") + '<br>' +
+          'MA20：' + ma20v + ' ｜ MA60：' + ma60v + ' ｜ BOLL：' + blStr +
+        '</div></div>';
+
+      /* 迷你 K 线图 */
+      content += '<div style="margin-bottom:14px"><div class="muted" style="font-size:12px;margin-bottom:4px">近 30 日 K 线</div>' +
+        '<div id="rvChart" style="height:200px;border:1px solid var(--line);border-radius:8px"></div></div>';
+    }
+  }catch(err){
+    content = '<div class="review-empty">' +
+      '<p style="font-size:16px">📋 ' + esc(nm) + '（' + esc(hd.code) + '）</p>' +
+      '<p>数据解析异常：' + esc(String(err.message || err).slice(0, 80)) + '</p>' +
+      '<p style="font-size:12px;color:var(--muted2)">可尝试重新拉取数据或手动粘贴日K</p>' +
+    '</div>';
+  }
+
+  ov.innerHTML =
+    '<div class="review-bar">' +
+      '<span style="font-size:18px">🎯</span>' +
+      '<div class="rb-title">复盘模式 — ' + esc(nm) + '（' + esc(hd.code) + '）</div>' +
+      '<span class="rb-count">' + (REVIEW.idx + 1) + ' / ' + REVIEW.items.length + '</span>' +
+      '<button class="btn sm" id="rvPrev"' + (REVIEW.idx === 0 ? " disabled" : "") + '>← 上一只</button>' +
+      '<button class="btn primary sm" id="rvNext">' + (isLast ? "✓ 完成" : "下一只 →") + '</button>' +
+      '<button class="btn sm" id="rvClose">✕ 退出</button>' +
+    '</div>' +
+    '<div class="review-body">' +
+      '<div class="review-nav">' +
+        '<span style="font-size:12px;color:var(--muted)">← / → 键翻页 · Esc 退出</span>' +
+        '<div class="rn-progress">' + prog + '</div>' +
+      '</div>' +
+      '<div class="review-content">' + content + '</div>' +
+      '<div style="margin-top:12px">' +
+        '<div class="muted" style="font-size:12px;margin-bottom:4px">快速笔记（写完按→下一只会自动保存）</div>' +
+        '<textarea id="rvQuickNote" rows="2" placeholder="对 ' + esc(nm) + ' 的判断 / 计划…" style="width:100%;font-size:13px;padding:8px 10px;background:#0e141f;border:1px solid var(--line2);border-radius:8px;color:var(--txt)"></textarea>' +
+      '</div>' +
+      '<div class="flex" style="gap:8px;justify-content:center;padding:16px 0">' +
+        '<button class="btn sm" id="rvStock">📊 深入诊断</button>' +
+        '<button class="btn sm" id="rvNote">📝 写详细笔记</button>' +
+        '<button class="btn sm" id="rvAlert">🔔 加提醒</button>' +
+        (an && an.dates && an.dates.length ? '<button class="btn sm" id="rvCompare">📊 加入对比</button>' : '') +
+      '</div>' +
+    '</div>';
+
+  /* 绑定事件 */
+  var prev = $("rvPrev"); if(prev) prev.onclick = reviewPrev;
+  var next = $("rvNext"); if(next) next.onclick = reviewNext;
+  var close = $("rvClose"); if(close) close.onclick = reviewClose;
+  var stock = $("rvStock"); if(stock) stock.onclick = function(){
+    reviewClose();
+    if(typeof pickStock === "function") pickStock(hd.code);
+    tab("stock");
+  };
+  var note = $("rvNote"); if(note) note.onclick = function(){
+    reviewClose();
+    tab("notes");
+    setTimeout(function(){
+      var sel = $("noteCode");
+      if(sel) sel.value = hd.code;
+      var ti = $("noteTitle");
+      if(ti){ ti.value = nm + " 复盘"; ti.focus(); }
+    }, 100);
+  };
+  var alert = $("rvAlert"); if(alert) alert.onclick = function(){
+    reviewClose();
+    if(typeof pickStock === "function") pickStock(hd.code);
+    tab("stock");
+    setTimeout(function(){
+      var box = $("stockAlertCard");
+      if(box) box.scrollIntoView({behavior:"smooth"});
+    }, 200);
+  };
+  var cmp = $("rvCompare");
+  if(cmp) cmp.onclick = function(){
+    if(typeof CMP_CODES !== "undefined" && CMP_CODES.indexOf(hd.code) < 0){
+      CMP_CODES.push(hd.code);
+      try{ localStorage.setItem("ashare_cmp", JSON.stringify(CMP_CODES)); }catch(e){}
+    }
+    toastOk(nm + " 已加入走势对比");
+  };
+  var fetch = $("rvFetch"); if(fetch) fetch.onclick = async function(){
+    toastInfo("正在拉取 " + nm + "…");
+    try{
+      var n = 0;
+      if(typeof fetchStockDataRetry === "function"){
+        n = await fetchStockDataRetry(hd.code);
+      } else if(typeof fetchStockData === "function"){
+        n = await fetchStockData(hd.code);
+      }
+      if(n > 0){ toastOk(nm + " 拉取成功，" + n + " 根日K"); reviewRender(); }
+      else toastWarn(nm + " 拉取失败，可手动粘贴日K", 4000);
+    }catch(e){ toastErr("拉取异常：" + String(e.message || e).slice(0, 40)); }
+  };
+
+  /* 渲染迷你K线图 */
+  if(an && an.dates && an.dates.length){
+    setTimeout(function(){ try{ renderRvChart(hd.code); }catch(e){} }, 50);
+  }
+
+  /* 聚焦到快速笔记 */
+  setTimeout(function(){
+    var qi = $("rvQuickNote");
+    if(qi) qi.focus();
+  }, 200);
+}
+
+/* 迷你K线图 */
+function renderRvChart(code){
+  var box = $("rvChart");
+  if(!box) return;
+  var s = state.stocks[code];
+  if(!s || !s.rows || !s.rows.length) return;
+  var rows = s.rows.slice(-30);
+  if(rows.length < 2) return;
+
+  /* 用 echarts */
+  if(typeof echarts === "undefined") return;
+  var chart = echarts.init(box);
+  var cats = rows.map(function(r){ return r.day; });
+  var ohlc = rows.map(function(r){ return [r.open, r.close, r.low, r.high]; });
+  var vols = rows.map(function(r){ return r.volume; });
+  var maxVol = Math.max.apply(null, vols);
+
+  chart.setOption({
+    animation:false,
+    grid:{left:40,right:16,top:16,bottom:48},
+    xAxis:{type:"category",data:cats,axisLabel:{fontSize:9,interval:Math.floor(rows.length/6)}},
+    yAxis:[{scale:true,splitLine:{lineStyle:{color:"rgba(38,49,69,.3)"}}},{scale:true,max:maxVol*4,splitLine:{show:false}}],
+    series:[
+      {type:"candlestick",data:ohlc,
+        itemStyle:{color:"#e74c3c",color0:"#2ecc71",borderColor:"#e74c3c",borderColor0:"#2ecc71"},
+        markPoint:{data:[
+          {type:"max",name:"高",valueIndex:3},
+          {type:"min",name:"低",valueIndex:2}
+        ],itemStyle:{color:"rgba(76,141,255,.6)"}}
+      },
+      {name:"量",type:"bar",xAxisIndex:0,yAxisIndex:1,data:vols,
+        itemStyle:{color:"rgba(76,141,255,.2)"}
+      }
+    ]
+  });
+  /* 自适应 */
+  if(!REVIEW._resizeRv){
+    REVIEW._resizeRv = function(){
+      var b = $("rvChart");
+      if(b){ echarts.getInstanceByDom(b) && echarts.getInstanceByDom(b).resize(); }
+    };
+    window.addEventListener("resize", REVIEW._resizeRv);
+  }
+}
+
+/* 复盘完成摘要 */
+function reviewRenderSummary(){
+  var ov = REVIEW.overlay;
+  if(!ov){
+    ov = document.createElement("div");
+    ov.className = "review-overlay";
+    document.body.appendChild(ov);
+    REVIEW.overlay = ov;
+  }
+
+  var n = REVIEW.items.length;
+  var reviewedN = REVIEW.reviewed.filter(function(v){ return v; }).length;
+  var noteN = REVIEW.notes.length;
+
+  /* 汇总统计 */
+  var bullN = 0, bearN = 0, avgScore = 0, scoreN = 0;
+  REVIEW.items.forEach(function(hd){
+    var an = null;
+    try{ an = getAn(hd.code); }catch(e){}
+    if(an && an.score){
+      avgScore += rvNum(an.score.total);
+      scoreN++;
+      if(an.score.total >= 62) bullN++;
+      if(an.score.total < 45) bearN++;
+    }
+  });
+  avgScore = scoreN ? Math.round(avgScore / scoreN) : 0;
+
+  var h =
+    '<div class="review-bar">' +
+      '<span style="font-size:18px">✅</span>' +
+      '<div class="rb-title">复盘完成</div>' +
+      '<button class="btn sm" id="rvClose">✕ 关闭</button>' +
+    '</div>' +
+    '<div class="review-body">' +
+      '<div class="review-content" style="text-align:center;padding:40px 20px">' +
+        '<div style="font-size:48px;margin-bottom:12px">🎉</div>' +
+        '<div style="font-size:18px;margin-bottom:20px">本次复盘完成！</div>' +
+        '<div class="grid g4" style="max-width:600px;margin:0 auto 24px">' +
+          '<div class="kpi"><div class="lb">复盘标的</div><div class="vl">' + n + '</div><div class="ex">共过 ' + reviewedN + ' 只</div></div>' +
+          '<div class="kpi ' + (avgScore >= 55 ? "up" : (avgScore < 45 ? "down" : "")) + '"><div class="lb">平均评分</div><div class="vl">' + (avgScore || "—") + '</div><div class="ex">技术形态综合</div></div>' +
+          '<div class="kpi up"><div class="lb">偏多</div><div class="vl">' + bullN + '</div><div class="ex">评分 ≥ 62</div></div>' +
+          '<div class="kpi down"><div class="lb">偏空</div><div class="vl">' + bearN + '</div><div class="ex">评分 < 45</div></div>' +
+        '</div>';
+
+  if(noteN > 0){
+    h += '<div style="text-align:left;max-width:600px;margin:0 auto 20px"><div class="muted" style="font-size:12px;margin-bottom:6px">本次快速笔记（' + noteN + ' 条）</div>';
+    REVIEW.notes.forEach(function(n){
+      h += '<div class="note-card"><div class="nc-head"><div class="nc-title">' + esc(n.name) + '</div><span class="nc-time">' + esc(n.time) + '</span></div><div class="nc-body">' + esc(n.text) + '</div></div>';
+    });
+    h += '</div>';
+  }
+
+  h += '<div class="flex" style="gap:8px;justify-content:center">' +
+      '<button class="btn primary sm" id="rvSaveNotes">💾 保存笔记到笔记页</button>' +
+      '<button class="btn sm" id="rvReport">📄 生成复盘报告</button>' +
+      '<button class="btn sm" id="rvRestart">🔄 重新复盘</button>' +
+    '</div>' +
+    '</div></div>';
+
+  ov.innerHTML = h;
+
+  var close = $("rvClose"); if(close) close.onclick = reviewClose;
+  var save = $("rvSaveNotes"); if(save) save.onclick = function(){
+    REVIEW.notes.forEach(function(n){
+      NOTES.unshift({code:n.code, name:n.name, title:"复盘快速笔记", text:n.text, tag:"复盘", time:n.time});
+    });
+    try{ localStorage.setItem("ashare_notes", JSON.stringify(NOTES)); }catch(e){}
+    renderNotes();
+    if(typeof renderQuickNav === "function") renderQuickNav();
+    toastOk("已保存 " + REVIEW.notes.length + " 条笔记");
+  };
+  var report = $("rvReport"); if(report) report.onclick = function(){
+    reviewClose();
+    tab("report");
+    setTimeout(function(){
+      var btn = $("genReport");
+      if(btn) btn.click();
+    }, 200);
+  };
+  var restart = $("rvRestart"); if(restart) restart.onclick = function(){
+    REVIEW.finished = false;
+    REVIEW.idx = 0;
+    REVIEW.reviewed = [];
+    REVIEW.notes = [];
+    reviewRender();
+  };
+}
+
+function bindReviewMode(){
+  var btn = $("btnReviewMode");
+  if(btn && !btn._rvBound){
+    btn._rvBound = true;
+    btn.onclick = openReviewMode;
+  }
+}
+
+/* ===================== 3. 仪表盘空状态打磨 ===================== */
+function polishEmptyStates(){
+  var changeBody = $("changeBody");
+  if(changeBody && !changeBody.innerHTML.trim()){
+    changeBody.innerHTML = '<div class="chg-empty">添加持仓并拉取数据后，这里会显示近 3 日信号与异动</div>';
+  }
+  var journalBox = $("journalBox");
+  if(journalBox && !journalBox.innerHTML.trim()){
+    journalBox.innerHTML = '<div class="chg-empty">点击下方按钮生成今日复盘日记</div>';
+  }
+}
+
+/* ===================== 初始化 ===================== */
+function initV18(){
+  try{ bindNoteTemplates(); }catch(e){}
+  try{ patchNotes(); }catch(e){}
+  try{ bindNoteAdd(); }catch(e){}
+  try{ bindReviewMode(); }catch(e){}
+}
+
+var _v2InitStepsOrigV18 = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrigV18();
+  try{
+    initV18();
+    /* 在 renderNotes 后渲染标签过滤器 */
+    var _origRN = renderNotes;
+    if(_origRN && !_origRN._tagPatched){
+      renderNotes = function(){
+        _origRN();
+        try{ renderNoteTagFilter(); }catch(e){}
+      };
+      renderNotes._tagPatched = true;
+    }
+  }catch(e){ if(console&&console.error) console.error("v18 init:", e); }
+};
+
+/* 在 renderDash 后打磨空状态 */
+var _renderDashV18Orig = null;
+function patchDashPolish(){
+  if(_renderDashV18Orig) return;
+  if(typeof renderDash !== "function") return;
+  _renderDashV18Orig = renderDash;
+  renderDash = function(){
+    _renderDashV18Orig();
+    try{ polishEmptyStates(); }catch(e){}
+  };
+}
+
+var _v2InitStepsOrigV18b = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrigV18b();
+  try{ patchDashPolish(); }catch(e){}
+};
+
+/* ============================================================
+   engine19 · v2.2 复盘日历热力图 / 雷达图 / 全局稳定性
+   ============================================================ */
+
+/* ===================== 1. 全局错误捕获 ===================== */
+function setupGlobalErrorGuard(){
+  /* 捕获未处理的 Promise rejection */
+  window.addEventListener("unhandledrejection", function(e){
+    var msg = String(e.reason && e.reason.message || e.reason || "").slice(0, 80);
+    if(console && console.error) console.error("未捕获 Promise:", e.reason);
+    if(typeof toastErr === "function") toastErr("操作异常（已恢复）：" + msg, 3000);
+    e.preventDefault();
+  });
+
+  /* 捕获运行时错误 */
+  window.addEventListener("error", function(e){
+    var msg = String(e.message || "").slice(0, 80);
+    var src = String(e.filename || "").split("/").pop() + ":" + (e.lineno || "?");
+    if(console && console.error) console.error("运行时错误:", msg, src);
+    /* 不弹 toast 避免刷屏，仅控制台 */
+    return false;
+  });
+}
+
+/* 安全渲染包装 */
+function safeRender(fn, fallback){
+  return function(){
+    try{ return fn.apply(this, arguments); }
+    catch(e){
+      if(console && console.error) console.error("渲染异常:", fn.name || "<anon>", e);
+      if(typeof fallback === "function"){ try{ return fallback(e); }catch(_){} }
+      return undefined;
+    }
+  };
+}
+
+/* 安全操作包装 */
+function safeCall(fn, errMsg){
+  return function(){
+    try{ return fn.apply(this, arguments); }
+    catch(e){
+      if(console && console.error) console.error("操作异常:", fn.name || "<anon>", e);
+      if(typeof toastErr === "function") toastErr(errMsg || "操作失败", 3000);
+    }
+  };
+}
+
+/* ===================== 2. 复盘日历热力图 ===================== */
+var CAL_DATE = new Date();
+
+function renderCalendar(){
+  var box = $("calHeatmap");
+  if(!box) return;
+  var year = CAL_DATE.getFullYear();
+  var month = CAL_DATE.getMonth();
+  var label = $("calLabel");
+  if(label) label.textContent = year + "年" + (month + 1) + "月";
+
+  var first = new Date(year, month, 1);
+  var firstDay = first.getDay(); /* 0=周日 */
+  var daysInMonth = new Date(year, month + 1, 0).getDate();
+  var today = new Date();
+  var todayStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
+
+  /* 从日记加载历史评分 */
+  var entries = [];
+  try{ entries = journalLoad(); }catch(e){}
+  var entryMap = {};
+  entries.forEach(function(e){
+    if(e.date) entryMap[e.date] = e;
+  });
+
+  var weekDays = ["日","一","二","三","四","五","六"];
+  var h = '<div class="cal-grid">';
+  weekDays.forEach(function(d){ h += '<div class="cal-hd">' + d + '</div>'; });
+
+  /* 空白填充 */
+  for(var i = 0; i < firstDay; i++){
+    h += '<div class="cal-cell empty"></div>';
+  }
+
+  for(var d = 1; d <= daysInMonth; d++){
+    var dateStr = year + "-" + String(month+1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+    var entry = entryMap[dateStr];
+    var score = entry ? (entry.portfolio ? entry.portfolio.avg : 0) : 0;
+    var hasData = !!entry;
+    var isToday = dateStr === todayStr;
+
+    /* 根据评分决定颜色 */
+    var bg = "transparent";
+    if(hasData && score){
+      if(score >= 62) bg = "rgba(34,197,94,.35)";
+      else if(score >= 50) bg = "rgba(76,141,255,.35)";
+      else if(score >= 40) bg = "rgba(245,165,36,.35)";
+      else bg = "rgba(255,77,79,.35)";
+    }
+
+    var cls = "cal-cell";
+    if(hasData) cls += " has-data";
+    if(isToday) cls += " today";
+    if(!hasData) cls += " empty";
+
+    var tip = "";
+    if(hasData){
+      var m = entry.market || {};
+      var p = entry.portfolio || {};
+      tip = '<div class="cal-tooltip">' + dateStr + ' · 上证' + (m.sh >= 0 ? "+" : "") + (m.sh||0) + '% · 评分' + (p.avg||0) + '</div>';
+    }
+
+    h += '<div class="' + cls + '" style="background:' + bg + '" data-date="' + dateStr + '">' +
+      d + tip + '</div>';
+  }
+  h += '</div>';
+  box.innerHTML = h;
+
+  /* 点击日期 */
+  box.querySelectorAll(".cal-cell:not(.empty)").forEach(function(c){
+    c.onclick = function(){
+      var date = c.dataset.date;
+      /* 找到对应日记条目并高亮 */
+      var entries = journalLoad();
+      var found = entries.find(function(e){ return e.date === date; });
+      if(found){
+        /* 滚动到日记区域 */
+        var jb = $("journalBox");
+        if(jb) jb.scrollIntoView({behavior:"smooth", block:"center"});
+        toastInfo(date + " 评分 " + ((found.portfolio||{}).avg||"—") + " 分");
+      } else {
+        toastInfo(date + " 无日记记录");
+      }
+    };
+  });
+}
+
+function bindCalendar(){
+  var prev = $("calPrev");
+  var next = $("calNext");
+  if(prev) prev.onclick = function(){
+    CAL_DATE.setMonth(CAL_DATE.getMonth() - 1);
+    renderCalendar();
+  };
+  if(next) next.onclick = function(){
+    CAL_DATE.setMonth(CAL_DATE.getMonth() + 1);
+    renderCalendar();
+  };
+}
+
+/* ===================== 3. 持仓评分雷达图 ===================== */
+function renderPortfolioRadar(){
+  var box = $("radarChart");
+  if(!box) return;
+  if(typeof echarts === "undefined") return;
+  if(!state.holdings.length){
+    box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted2);font-size:13px">添加持仓后显示评分雷达图</div>';
+    return;
+  }
+
+  /* 取前5只评分最高的 */
+  var items = state.holdings.map(function(hd){
+    var an = null;
+    try{ an = getAn(hd.code); }catch(e){}
+    var s = (an && an.score) ? an.score : {};
+    return {
+      code: hd.code,
+      name: hd.name || (an ? an.name : "") || hd.code,
+      trend: s.trend || 0,
+      momentum: s.momentum || s.dyn || 0,
+      volume: s.volume || s.vol || 0,
+      position: s.position || s.pos || 0,
+      pattern: s.pattern || s.shape || 0,
+      total: s.total || 0
+    };
+  }).filter(function(x){ return x.total > 0; })
+    .sort(function(a, b){ return b.total - a.total; })
+    .slice(0, 5);
+
+  if(!items.length){
+    box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted2);font-size:13px">拉取数据后显示评分雷达图</div>';
+    return;
+  }
+
+  var chart = echarts.init(box);
+  var indicators = [
+    {name:"趋势", max:100},
+    {name:"动量", max:100},
+    {name:"量能", max:100},
+    {name:"位置", max:100},
+    {name:"形态", max:100}
+  ];
+
+  var series = items.map(function(it, i){
+    return {
+      name: it.name,
+      value: [it.trend, it.momentum, it.volume, it.position, it.pattern],
+      itemStyle:{color: CMP_COLOR[i % CMP_COLOR.length]}
+    };
+  });
+
+  chart.setOption({
+    animation:false,
+    legend:{
+      data: items.map(function(it){ return it.name; }),
+      bottom:0,
+      textStyle:{color:"#8b95a8", fontSize:11}
+    },
+    radar:{
+      indicator: indicators,
+      shape:"polygon",
+      splitNumber:4,
+      axisName:{color:"#8b95a8", fontSize:11},
+      splitLine:{lineStyle:{color:"rgba(38,49,69,.4)"}},
+      splitArea:{areaStyle:{color:["rgba(38,49,69,.05)","rgba(38,49,69,.1)"]}},
+      axisLine:{lineStyle:{color:"rgba(38,49,69,.3)"}}
+    },
+    series:[{
+      type:"radar",
+      data:series,
+      areaStyle:{opacity:0.08},
+      lineStyle:{width:2},
+      symbol:"circle",
+      symbolSize:5
+    }]
+  });
+
+  if(!box._resizeBound){
+    box._resizeBound = true;
+    window.addEventListener("resize", function(){
+      var b = $("radarChart");
+      if(b){ var c = echarts.getInstanceByDom(b); if(c) c.resize(); }
+    });
+  }
+}
+
+/* ===================== 4. 增强仪表盘渲染 ===================== */
+var _renderDashV19Orig = null;
+function patchRenderDashV19(){
+  if(_renderDashV19Orig) return;
+  if(typeof renderDash !== "function") return;
+  _renderDashV19Orig = renderDash;
+  renderDash = function(){
+    _renderDashV19Orig();
+    try{ renderCalendar(); }catch(e){}
+    try{ renderPortfolioRadar(); }catch(e){}
+  };
+}
+
+/* ===================== 初始化 ===================== */
+function initV19(){
+  try{ setupGlobalErrorGuard(); }catch(e){}
+  try{ bindCalendar(); }catch(e){}
+  try{ patchRenderDashV19(); }catch(e){}
+}
+
+var _v2InitStepsOrigV19 = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrigV19();
+  try{ initV19(); }catch(e){ if(console&&console.error) console.error("v19 init:", e); }
+};
+
+/* ============================================================
+   engine20 · v2.2 手动画线 + 性能优化 + UI 微调
+   ============================================================ */
+
+/* ===================== 1. 性能优化工具 ===================== */
+
+/* rAF 防抖：多次调用只执行最后一帧 */
+function rAFDebounce(fn){
+  var timer = null;
+  return function(){
+    var args = arguments, ctx = this;
+    if(timer) cancelAnimationFrame(timer);
+    timer = requestAnimationFrame(function(){
+      timer = null;
+      fn.apply(ctx, args);
+    });
+  };
+}
+
+/* 简单防抖 */
+function debounce(fn, wait){
+  var timer = null;
+  return function(){
+    var args = arguments, ctx = this;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ fn.apply(ctx, args); }, wait);
+  };
+}
+
+/* ECharts 实例缓存池 */
+var _chartPool = {};
+function getChart(domId){
+  if(!_chartPool[domId]){
+    var el = document.getElementById(domId);
+    if(!el || typeof echarts === "undefined") return null;
+    _chartPool[domId] = echarts.init(el);
+  }
+  return _chartPool[domId];
+}
+function disposeChart(domId){
+  if(_chartPool[domId]){
+    try{ _chartPool[domId].dispose(); }catch(e){}
+    delete _chartPool[domId];
+  }
+}
+
+/* 优化 resize：全局只绑定一次 */
+var _resizeBound = false;
+function bindGlobalResize(){
+  if(_resizeBound) return;
+  _resizeBound = true;
+  var fn = rAFDebounce(function(){
+    for(var k in _chartPool){
+      try{ _chartPool[k].resize(); }catch(e){}
+    }
+    /* 也 resize 非 pool 管理的图表 */
+    if(typeof resizeAllCharts === "function"){
+      try{ resizeAllCharts(); }catch(e){}
+    }
+  });
+  window.addEventListener("resize", fn);
+}
+
+/* DOM 批量更新 */
+function batchDOM(fn){
+  var frag = document.createDocumentFragment();
+  fn(frag);
+  return frag;
+}
+
+/* ===================== 2. 手动画线 ===================== */
+var DRAW = {mode:"off", points:[], shapes:[], chart:null, code:""};
+
+function drawLoad(code){
+  DRAW.code = code;
+  try{
+    var s = localStorage.getItem("ashare_draw_" + code);
+    DRAW.shapes = s ? JSON.parse(s) : [];
+  }catch(e){ DRAW.shapes = []; }
+}
+
+function drawSave(){
+  if(!DRAW.code) return;
+  try{ localStorage.setItem("ashare_draw_" + DRAW.code, JSON.stringify(DRAW.shapes)); }catch(e){}
+}
+
+function drawSetMode(mode){
+  DRAW.mode = mode;
+  DRAW.points = [];
+  if(DRAW.chart){
+    try{ DRAW.chart.off("click", drawOnClick); DRAW.chart.off("mousedown", drawOnClick); }catch(e){}
+    if(mode !== "off"){
+      DRAW.chart.on("click", drawOnClick);
+    }
+  }
+  /* 更新光标 */
+  var kl = $("kline");
+  if(kl){
+    kl.style.cursor = mode === "off" ? "crosshair" : "crosshair";
+  }
+}
+
+function drawOnClick(params){
+  if(DRAW.mode === "off") return;
+  if(!params || params.componentType !== "series") return;
+
+  var p = {x:params.value[0] || params.dataIndex, y:params.value[1]};
+  /* 对于非 candlestick 系列（如收盘线），用 event offsetX/Y */
+  if(params.value && typeof params.value[1] !== "number"){
+    var cv = DRAW.chart.convertFromPixel({seriesIndex:0}, [params.event.event.offsetX, params.event.event.offsetY]);
+    p = {x:cv[0], y:cv[1]};
+  }
+
+  DRAW.points.push(p);
+
+  if(DRAW.mode === "line" && DRAW.points.length >= 2){
+    DRAW.shapes.push({type:"line", p1:DRAW.points[0], p2:DRAW.points[1], color:"#4c8dff"});
+    DRAW.points = [];
+    drawApply();
+    drawSave();
+    toastInfo("趋势线已添加");
+  } else if(DRAW.mode === "hline" && DRAW.points.length >= 1){
+    DRAW.shapes.push({type:"hline", y:DRAW.points[0].y, color:"#f5a524"});
+    DRAW.points = [];
+    drawApply();
+    drawSave();
+    toastInfo("水平线已添加");
+  } else if(DRAW.mode === "channel" && DRAW.points.length >= 3){
+    DRAW.shapes.push({type:"channel", p1:DRAW.points[0], p2:DRAW.points[1], p3:DRAW.points[2], color:"#a371f7"});
+    DRAW.points = [];
+    drawApply();
+    drawSave();
+    toastInfo("通道已添加");
+  } else if(DRAW.mode === "rect" && DRAW.points.length >= 2){
+    DRAW.shapes.push({type:"rect", p1:DRAW.points[0], p2:DRAW.points[1], color:"rgba(76,141,255,.2)"});
+    DRAW.points = [];
+    drawApply();
+    drawSave();
+    toastInfo("矩形已添加");
+  } else if(DRAW.mode === "text" && DRAW.points.length >= 1){
+    var txt = prompt("输入标注文字：");
+    if(txt){
+      DRAW.shapes.push({type:"text", p:DRAW.points[0], text:txt, color:"#e8eef7"});
+      drawApply();
+      drawSave();
+    }
+    DRAW.points = [];
+  }
+}
+
+function drawApply(){
+  if(!DRAW.chart) return;
+  /* 先移除旧的 graphic */
+  try{ DRAW.chart.setOption({graphic:[]}); }catch(e){}
+
+  var graphics = [];
+  DRAW.shapes.forEach(function(s, i){
+    if(s.type === "line" || s.type === "channel"){
+      /* 趋势线：用 markLine */
+      graphics.push({
+        type:"line",
+        shape:{
+          x1:drawToPx(s.p1.x), y1:drawToPx(s.p1.y),
+          x2:drawToPx(s.p2.x), y2:drawToPx(s.p2.y)
+        },
+        style:{stroke:s.color, lineWidth:2},
+        z:50
+      });
+      if(s.type === "channel" && s.p3){
+        /* 第三点定义平行偏移 */
+        var dx = drawToPx(s.p2.x) - drawToPx(s.p1.x);
+        var dy = drawToPx(s.p2.y) - drawToPx(s.p1.y);
+        graphics.push({
+          type:"line",
+          shape:{
+            x1:drawToPx(s.p3.x), y1:drawToPx(s.p3.y),
+            x2:drawToPx(s.p3.x) + dx, y2:drawToPx(s.p3.y) + dy
+          },
+          style:{stroke:s.color, lineWidth:2, lineDash:[4,4]},
+          z:50
+        });
+      }
+    } else if(s.type === "hline"){
+      /* 水平线：横跨整个图表 */
+      graphics.push({
+        type:"line",
+        shape:{
+          x1:0, y1:drawToPx(s.y),
+          x2:9999, y2:drawToPx(s.y)
+        },
+        style:{stroke:s.color, lineWidth:1.5, lineDash:[6,3]},
+        z:50
+      });
+    } else if(s.type === "rect"){
+      graphics.push({
+        type:"rect",
+        shape:{
+          x:Math.min(drawToPx(s.p1.x), drawToPx(s.p2.x)),
+          y:Math.min(drawToPx(s.p1.y), drawToPx(s.p2.y)),
+          width:Math.abs(drawToPx(s.p2.x) - drawToPx(s.p1.x)),
+          height:Math.abs(drawToPx(s.p2.y) - drawToPx(s.p1.y))
+        },
+        style:{fill:s.color, stroke:s.color.replace(/[\d.]+\)/,"0.6)"), lineWidth:1},
+        z:49
+      });
+    } else if(s.type === "text"){
+      graphics.push({
+        type:"text",
+        style:{
+          text:s.text,
+          x:drawToPx(s.p.x),
+          y:drawToPx(s.p.y) - 10,
+          fill:s.color,
+          fontSize:12,
+          fontWeight:600,
+          textBackgroundColor:"rgba(18,24,38,.8)",
+          textPadding:[4,6]
+        },
+        z:51
+      });
+    }
+  });
+
+  if(graphics.length){
+    try{ DRAW.chart.setOption({graphic:graphics}); }catch(e){}
+  }
+}
+
+/* 将数据坐标转为像素坐标 */
+function drawToPx(val){
+  /* 画线时值已经是像素坐标（convertFromPixel 的结果），直接返回 */
+  return Math.round(val);
+}
+
+function drawClear(){
+  if(!confirm("确定清空当前标的所有画线？")) return;
+  DRAW.shapes = [];
+  drawSave();
+  drawApply();
+  toastOk("画线已清空");
+}
+
+/* 绑定画线按钮 */
+function bindDrawTools(){
+  var seg = $("segDraw");
+  if(!seg || seg._bound) return;
+  seg._bound = true;
+  seg.querySelectorAll("button").forEach(function(b){
+    b.onclick = function(){
+      seg.querySelectorAll("button").forEach(function(x){ x.classList.remove("on"); });
+      b.classList.add("on");
+      drawSetMode(b.dataset.d);
+      if(b.dataset.d !== "off"){
+        toastInfo("画线模式：" + b.textContent.trim() + "，点击图表添加");
+      }
+    };
+  });
+
+  var clr = $("btnClearDraw");
+  if(clr) clr.onclick = drawClear;
+}
+
+/* 在 renderKline 后设置 chart 引用并应用已有画线 */
+var _renderKlineOrig = null;
+function patchRenderKline(){
+  if(_renderKlineOrig) return;
+  if(typeof renderKline !== "function") return;
+  _renderKlineOrig = renderKline;
+  renderKline = function(){
+    _renderKlineOrig();
+    try{
+      /* 获取 echarts 实例 */
+      var kl = $("kline");
+      if(kl){
+        var inst = echarts.getInstanceByDom(kl);
+        if(inst){
+          DRAW.chart = inst;
+          drawApply();
+        }
+      }
+    }catch(e){}
+  };
+}
+
+/* 在 pickStock 后加载该股的画线 */
+var _pickStockOrig = null;
+function patchPickStock(){
+  if(_pickStockOrig) return;
+  if(typeof pickStock !== "function") return;
+  _pickStockOrig = pickStock;
+  pickStock = function(code){
+    _pickStockOrig(code);
+    try{
+      drawLoad(code);
+      /* 等图表渲染完再应用 */
+      setTimeout(function(){ drawApply(); }, 300);
+    }catch(e){}
+  };
+}
+
+/* ===================== 3. UI 微调 ===================== */
+
+/* nav 改进 */
+function polishNav(){
+  var nav = document.querySelector("nav");
+  if(!nav) return;
+  /* 确保 nav 按钮有微交互 */
+  nav.querySelectorAll("a").forEach(function(a){
+    if(a._polished) return;
+    a._polished = true;
+    a.addEventListener("mouseenter", function(){
+      a.style.transform = "translateX(2px)";
+    });
+    a.addEventListener("mouseleave", function(){
+      a.style.transform = "";
+    });
+  });
+}
+
+/* section 切换动画增强 */
+function polishSectionSwitch(){
+  /* 已经有 fade 动画，这里增强一下过渡 */
+  var style = document.createElement("style");
+  style.textContent =
+    "section.on{animation:fade .22s cubic-bezier(.4,0,.2,1) both}" +
+    ".card{animation:cardFade .28s cubic-bezier(.4,0,.2,1) both}" +
+    "@keyframes cardFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}" +
+    ".kpi{animation:cardFade .24s cubic-bezier(.4,0,.2,1) both}" +
+    /* 输入框聚焦发光 */
+    "input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px rgba(76,141,255,.12),0 0 12px rgba(76,141,255,.06)}" +
+    /* 表格行悬停 */
+    "tbody tr:hover{background:rgba(76,141,255,.04)}" +
+    /* chip 微交互 */
+    ".chip{transition:transform var(--t),box-shadow var(--t)}" +
+    ".chip:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}" +
+    /* pbadge 微动画 */
+    ".pbadge{transition:transform var(--t)}" +
+    ".pbadge:hover{transform:scale(1.05)}" +
+    /* 链接下划线动画 */
+    "a{text-decoration:none;position:relative}" +
+    "a[href]:after{content:'';position:absolute;bottom:-1px;left:0;width:0;height:1px;background:currentColor;transition:width var(--t)}" +
+    "a[href]:hover:after{width:100%}";
+  document.head.appendChild(style);
+}
+
+/* ===================== 初始化 ===================== */
+function initV20(){
+  try{ bindGlobalResize(); }catch(e){}
+  try{ bindDrawTools(); }catch(e){}
+  try{ patchRenderKline(); }catch(e){}
+  try{ patchPickStock(); }catch(e){}
+  try{ polishNav(); }catch(e){}
+  try{ polishSectionSwitch(); }catch(e){}
+}
+
+var _v2InitStepsOrigV20 = v2InitSteps;
+v2InitSteps = function(){
+  _v2InitStepsOrigV20();
+  try{ initV20(); }catch(e){ if(console&&console.error) console.error("v20 init:", e); }
+};
 

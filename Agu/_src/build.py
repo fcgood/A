@@ -6,7 +6,7 @@ def rd(p):
     return io.open(os.path.join(base, p), encoding='utf-8').read()
 
 sh = rd('shell.html').replace('background:#2c3purple;background:#2c3850;', 'background:#2c3850;')
-eng = '\n'.join(rd('engine%d.js' % i) for i in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13))
+eng = '\n'.join(rd('engine%d.js' % i) for i in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20))
 data = rd('data.js')
 assert '/*__DATA__*/' in sh, 'data placeholder missing'
 assert '/*__ENGINE__*/' in sh, 'engine placeholder missing'

@@ -85,7 +85,7 @@ const sec = t => console.log('\n===== ' + t + ' =====');
 
 
 sec('1. 版本与全局状态');
-ok(G('APPVER') === '2.0.0', '版本号 v2.0.0', G('APPVER'));
+ok(G('APPVER') === '2.2', '版本号 v2.2', G('APPVER'));
 ok(Array.isArray(G('KLSET.ma')) && G('KLSET.ma').length === 4, 'KLSET 均线默认 4 条', JSON.stringify(G('KLSET.ma')));
 ok(Object.keys(G('KL_PRESETS')).length === 6, '6 套 K 线预设', Object.keys(G('KL_PRESETS')).join('/'));
 ok(G('typeof APICFG.tpl.tx') === 'string', 'APICFG 含腾讯模板');
@@ -211,8 +211,8 @@ ok(lastOpt && lastOpt.dataZoom && lastOpt.dataZoom.length === 1, '评分图可�
 
 sec('11. 关于页 / 快捷搜索');
 G('renderAbout()');
-ok(String(G('$("changelog").innerHTML')).indexOf('2.0.0') >= 0, '更新日志含 2.0.0');
-ok(String(G('$("verBadge").innerHTML') || '').indexOf('v2.0.0') >= 0 || G('APPVER') === '2.0.0', '版本徽章');
+ok(String(G('$("changelog").innerHTML')).indexOf('2.2') >= 0, '更新日志含 2.2');
+ok(String(G('$("verBadge").innerHTML') || '').indexOf('v2.2') >= 0 || G('APPVER') === '2.2', '版本徽章');
 const ci = G('cmdkItems().length');
 ok(ci > 10, '快捷搜索条目', ci + ' 条');
 

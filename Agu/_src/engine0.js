@@ -186,8 +186,8 @@ var CMP = {sel:[], span:60};
 var CMP_COLOR=["#58a6ff","#ff4d4f","#f5a524","#a371f7","#22c55e","#e3b341"];
 
 /* ===== v2.0 全局状态（须优先初始化，避免 TDZ） ===== */
-var APPVER  = "2.0.0";
-var APPDATE = "2026-09-12";
+var APPVER  = "2.2";
+var APPDATE = "2026-09-14";
 
 /* K线显示设置 */
 var KLSET = {preset:"full", ma:[5,10,20,60], candle:"solid", log:false,

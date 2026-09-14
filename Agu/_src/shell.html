@@ -6,33 +6,43 @@
 <title>A股每日复盘分析器 · 技术分析版</title>
 <style>
 :root{
-  --bg:#0b0f16; --panel:#131a25; --panel2:#1a2231; --panel3:#202a3a;
-  --line:#263145; --line2:#31405a;
+  --bg:#0a0e16; --panel:#121826; --panel2:#182030; --panel3:#1f2839;
+  --line:#252e42; --line2:#364260;
   --txt:#e8eef7; --muted:#93a1b8; --muted2:#6b7a91;
   --up:#ff4d4f; --upBg:rgba(255,77,79,.14);
   --down:#22c55e; --downBg:rgba(34,197,94,.14);
   --accent:#4c8dff; --accentBg:rgba(76,141,255,.13);
   --warn:#f5a524; --warnBg:rgba(245,165,36,.13);
   --purple:#a371f7;
-  --r:12px; --r2:8px;
-  --shadow:0 4px 20px rgba(0,0,0,.35);
+  --r:14px; --r2:10px;
+  --shadow:0 2px 8px rgba(0,0,0,.2),0 4px 24px rgba(0,0,0,.16);
+  --shadow-sm:0 1px 4px rgba(0,0,0,.16);
+  --shadow-lg:0 8px 40px rgba(0,0,0,.32);
+  --glow:0 0 0 1px rgba(76,141,255,.12),0 2px 12px rgba(76,141,255,.08);
+  --t:.18s cubic-bezier(.4,0,.2,1);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
-  background:radial-gradient(1200px 600px at 15% -10%,#16233a 0%,transparent 60%),
-             radial-gradient(900px 500px at 100% 0%,#1a2333 0%,transparent 55%),
+  background:radial-gradient(1200px 600px at 15% -10%,#152842 0%,transparent 55%),
+             radial-gradient(900px 500px at 100% 0%,#1a2840 0%,transparent 50%),
+             radial-gradient(600px 400px at 50% 100%,#121f33 0%,transparent 40%),
              var(--bg);
+  background-attachment:fixed;
   color:var(--txt);
-  font:14px/1.6 "PingFang SC","Microsoft YaHei","Segoe UI",system-ui,-apple-system,sans-serif;
+  font:14px/1.65 "PingFang SC","Microsoft YaHei","Segoe UI",system-ui,-apple-system,sans-serif;
   min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
 }
 h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:.2px}
-a{color:var(--accent)}
-::-webkit-scrollbar{width:10px;height:10px}
+a{color:var(--accent);transition:color var(--t)}
+a:hover{color:#6ba3ff}
+::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#2c3purple;background:#2c3850;border-radius:6px}
-::-webkit-scrollbar-thumb:hover{background:#3a4a68}
+::-webkit-scrollbar-thumb{background:#2c3850;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#3a4a68;background-clip:content-box}
 
 /* ---------- header ---------- */
 header{
@@ -88,10 +98,12 @@ section.on{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 .card{
-  background:linear-gradient(180deg,var(--panel) 0%,#111823 100%);
+  background:linear-gradient(180deg,var(--panel) 0%,#101620 100%);
   border:1px solid var(--line);border-radius:var(--r);
   padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow);
+  transition:border-color var(--t),box-shadow var(--t);
 }
+.card:hover{border-color:var(--line2)}
 .card>h3:first-child{
   font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   padding-bottom:10px;border-bottom:1px solid var(--line);
@@ -111,22 +123,23 @@ section.on{display:block}
 .btn{
   background:var(--panel2);color:var(--txt);border:1px solid var(--line2);
   padding:7px 14px;border-radius:var(--r2);cursor:pointer;font-size:13px;
-  transition:.15s;font-family:inherit;font-weight:500;
+  transition:var(--t);font-family:inherit;font-weight:500;
 }
-.btn:hover{background:var(--panel3);border-color:var(--accent);transform:translateY(-1px)}
-.btn:active{transform:none}
+.btn:hover{background:var(--panel3);border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.btn:active{transform:translateY(0)}
 .btn.primary{background:linear-gradient(135deg,#3b7bff,#2f6ae0);border-color:#3b7bff;color:#fff}
-.btn.primary:hover{box-shadow:0 4px 14px rgba(59,123,255,.36)}
+.btn.primary:hover{box-shadow:0 4px 16px rgba(59,123,255,.4);filter:brightness(1.08)}
 .btn.danger{border-color:rgba(255,77,79,.5);color:#ff8a8a}
 .btn.danger:hover{background:rgba(255,77,79,.14);border-color:var(--up)}
-.btn.sm{padding:4px 10px;font-size:12px;border-radius:6px}
+.btn.sm{padding:4px 10px;font-size:12px;border-radius:7px}
 .btn.on{background:rgba(76,141,255,.2);border-color:var(--accent);color:#cfe1ff}
 .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .muted{color:var(--muted);font-size:12.5px}
 .hint{color:var(--muted2);font-size:12px;line-height:1.7}
 input,select,textarea{
-  background:#0e141f;color:var(--txt);border:1px solid var(--line2);
+  background:#0d1320;color:var(--txt);border:1px solid var(--line2);
   padding:7px 10px;border-radius:var(--r2);font-size:13px;font-family:inherit;width:100%;
+  transition:border-color var(--t),box-shadow var(--t);
 }
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,141,255,.13)}
 label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
@@ -204,11 +217,12 @@ input.qa{background:var(--panel2)}
 
 /* ---------- kpi ---------- */
 .kpi{
-  background:linear-gradient(160deg,var(--panel2) 0%,#141c28 100%);
-  border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;
+  background:linear-gradient(160deg,var(--panel2) 0%,#121a26 100%);
+  border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;
+  box-shadow:var(--shadow-sm);
 }
-.kpi .lb{font-size:11.5px;color:var(--muted2);letter-spacing:.4px}
-.kpi .vl{font-size:21px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+.kpi .lb{font-size:11px;color:var(--muted2);letter-spacing:.5px;text-transform:uppercase}
+.kpi .vl{font-size:22px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
 .kpi .ex{font-size:11.5px;color:var(--muted);margin-top:2px}
 .kpi.up .vl{color:var(--up)} .kpi.down .vl{color:var(--down)}
 #idxCards .kpi .vl{font-size:27px;letter-spacing:.5px}
@@ -499,8 +513,358 @@ details summary:hover{color:var(--txt)}
 .airisk b{color:var(--warn);font-weight:600}
 .aibar{height:6px;border-radius:3px;background:var(--line2);overflow:hidden;margin-top:5px}
 .aibar i{display:block;height:100%;border-radius:3px}
+/* ============================================================
+   v2.1 UI 增强：Toast / 市场状态 / 快捷键面板 / 回到顶部 / 动画
+   ============================================================ */
+
+/* ---------- Toast 通知 ---------- */
+#toastBox{position:fixed;bottom:24px;right:24px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:380px}
+.toast{
+  pointer-events:auto;display:flex;align-items:flex-start;gap:10px;padding:11px 14px 11px 12px;
+  border-radius:10px;border:1px solid var(--line2);background:var(--panel);box-shadow:0 8px 28px rgba(0,0,0,.4);
+  font-size:13px;line-height:1.6;color:var(--txt);
+  animation:toastIn .3s cubic-bezier(.2,.7,.3,1) both;position:relative;overflow:hidden;
+}
+.toast.out{animation:toastOut .25s ease forwards}
+.toast::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.toast.info::before{background:var(--accent)}
+.toast.success::before{background:var(--down)}
+.toast.warn::before{background:var(--warn)}
+.toast.error::before{background:var(--up)}
+.toast .ic{flex:0 0 auto;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;margin-top:1px}
+.toast.info .ic{background:var(--accent)}
+.toast.success .ic{background:var(--down)}
+.toast.warn .ic{background:var(--warn)}
+.toast.error .ic{background:var(--up)}
+.toast .bd{flex:1;min-width:0}
+.toast .cls{flex:0 0 auto;cursor:pointer;color:var(--muted2);font-size:14px;line-height:1;padding:2px;border-radius:4px}
+.toast .cls:hover{color:var(--txt);background:rgba(255,255,255,.06)}
+.toast .pb{position:absolute;bottom:0;left:3px;right:0;height:2px;background:rgba(255,255,255,.1);transform-origin:left}
+.toast.info .pb i{display:block;height:100%;background:var(--accent)}
+.toast.success .pb i{display:block;height:100%;background:var(--down)}
+.toast.warn .pb i{display:block;height:100%;background:var(--warn)}
+.toast.error .pb i{display:block;height:100%;background:var(--up)}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px) scale(.95)}to{opacity:1;transform:none}}
+@keyframes toastOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(40px) scale(.95)}}
+
+/* ---------- 市场状态指示器 ---------- */
+.mkt-badge{
+  display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;
+  font-size:12px;font-weight:500;border:1px solid var(--line2);background:var(--panel2);
+  cursor:default;transition:.3s;
+}
+.mkt-badge .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;transition:.3s}
+.mkt-badge.open{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
+.mkt-badge.open .dot{background:var(--down);box-shadow:0 0 0 3px rgba(34,197,94,.18);animation:pulseDot 2s ease-in-out infinite}
+.mkt-badge.closed{border-color:rgba(139,148,158,.3);background:rgba(139,148,158,.06)}
+.mkt-badge.closed .dot{background:var(--muted2)}
+.mkt-badge.lunch{border-color:rgba(245,165,36,.35);background:rgba(245,165,36,.08)}
+.mkt-badge.lunch .dot{background:var(--warn);box-shadow:0 0 0 3px rgba(245,165,36,.14)}
+.mkt-badge .cd{font-variant-numeric:tabular-nums;color:var(--muted);font-size:11.5px}
+@keyframes pulseDot{0%,100%{box-shadow:0 0 0 3px rgba(34,197,94,.18)}50%{box-shadow:0 0 0 6px rgba(34,197,94,.08)}}
+
+/* ---------- 快捷键帮助面板 ---------- */
+.shortcut-overlay{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;padding:20px;animation:fade .2s ease}
+.shortcut-overlay[style*="display:none"]{animation:none}
+.shortcut-box{width:min(580px,94vw);max-height:82vh;overflow-y:auto;background:var(--panel);
+  border:1px solid var(--line2);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden;
+  animation:scaleIn .25s cubic-bezier(.2,.7,.3,1) both}
+@keyframes scaleIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+.shortcut-box .sh{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(90deg,rgba(76,141,255,.10),transparent)}
+.shortcut-box .sh h3{font-size:16px;display:flex;align-items:center;gap:8px}
+.shortcut-box .sh h3::before{content:"⌨";font-size:18px}
+.shortcut-box .sh .cls{cursor:pointer;color:var(--muted);font-size:20px;line-height:1;padding:4px 8px;border-radius:6px}
+.shortcut-box .sh .cls:hover{color:var(--txt);background:rgba(255,255,255,.06)}
+.shortcut-grid{padding:8px 20px 20px}
+.shortcut-section{margin-top:14px}
+.shortcut-section h4{font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--muted2);margin-bottom:8px;text-transform:uppercase}
+.shortcut-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px dashed rgba(38,49,69,.4)}
+.shortcut-row:last-child{border-bottom:0}
+.shortcut-row .desc{font-size:13px;color:var(--muted)}
+.shortcut-row .keys{display:flex;gap:4px;align-items:center}
+.shortcut-row kbd{display:inline-block;min-width:22px;text-align:center;padding:2px 7px;
+  border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;background:rgba(255,255,255,.04);
+  font:12px/1.5 ui-monospace,Consolas,monospace;color:var(--txt)}
+.shortcut-row .plus{color:var(--muted2);font-size:11px}
+
+/* ---------- 回到顶部按钮 ---------- */
+#scrollTop{position:fixed;bottom:24px;left:24px;z-index:300;width:40px;height:40px;border-radius:50%;
+  border:1px solid var(--line2);background:var(--panel);color:var(--muted);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:.3s;
+  box-shadow:0 4px 16px rgba(0,0,0,.3)}
+#scrollTop.show{opacity:1;pointer-events:auto}
+#scrollTop:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
+
+/* ---------- 卡片悬停增强 ---------- */
+.card{transition:border-color .2s,box-shadow .2s}
+.card:hover{border-color:rgba(76,141,255,.25)}
+.kpi{transition:transform .2s,border-color .2s}
+.kpi:hover{transform:translateY(-2px);border-color:rgba(76,141,255,.3)}
+
+/* ---------- 导航徽章脉冲 ---------- */
+.navbadge{background:var(--up)!important;animation:badgePulse 1.6s ease-in-out infinite}
+@keyframes badgePulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,79,.4)}50%{box-shadow:0 0 0 4px rgba(255,77,79,0)}}
+
+/* ---------- 数字滚动动画 ---------- */
+.count-up{display:inline-block;transition:all .4s cubic-bezier(.2,.7,.3,1)}
+
+/* ---------- 空状态增强 ---------- */
+.empty-state{text-align:center;padding:44px 20px;color:var(--muted2)}
+.empty-state .ic{font-size:36px;margin-bottom:10px;opacity:.5}
+.empty-state .tt{font-size:14px;margin-bottom:6px;color:var(--muted)}
+.empty-state .ds{font-size:12.5px;line-height:1.7;max-width:360px;margin:0 auto}
+.empty-state .cta{margin-top:14px}
+
+/* ---------- 加载骨架屏 ---------- */
+.skeleton{background:linear-gradient(90deg,var(--panel2) 25%,var(--panel3) 50%,var(--panel2) 75%);
+  background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
+@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+.skeleton-line{height:14px;margin-bottom:8px}
+.skeleton-line:last-child{width:60%}
+
+/* ---------- 标签页 URL hash 高亮 ---------- */
+nav button[data-tab].active::after{
+  content:"";position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  width:20px;height:2px;border-radius:1px;background:var(--accent);opacity:.6;
+}
+nav button{position:relative}
+
+/* ---------- section 切换动画增强 ---------- */
+section.on{animation:fadeUp .3s cubic-bezier(.2,.7,.3,1)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ============================================================
+   浮动快捷面板 / 复盘检查清单 / 隐私模式 / 市场脉搏 / 持仓异动 / 分组 / 日记
+   ============================================================ */
+
+/* ---------- 浮动加标的按钮 ---------- */
+#fabAdd{
+  position:fixed;bottom:24px;right:50%;transform:translateX(580px);z-index:300;
+  width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;
+  background:linear-gradient(135deg,#3b7bff,#2f6ae0);color:#fff;font-size:26px;line-height:1;
+  box-shadow:0 6px 24px rgba(59,123,255,.4);transition:.3s;
+  display:flex;align-items:center;justify-content:center;
+}
+#fabAdd:hover{transform:translateX(580px) scale(1.08);box-shadow:0 8px 30px rgba(59,123,255,.5)}
+#fabAdd .fab-badge{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;border-radius:9px;
+  background:var(--up);color:#fff;font-size:10px;line-height:18px;text-align:center;padding:0 4px;
+  border:2px solid var(--bg)}
+@media(max-width:1400px){#fabAdd{right:24px;transform:none}#fabAdd:hover{transform:scale(1.08)}}
+
+/* ---------- 浮动面板 ---------- */
+.qa-panel{
+  position:fixed;bottom:88px;right:24px;z-index:400;width:380px;max-width:94vw;
+  background:var(--panel);border:1px solid var(--line2);border-radius:14px;
+  box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden;
+  animation:scaleIn .25s cubic-bezier(.2,.7,.3,1) both;
+}
+.qa-panel.out{animation:scaleOut .2s ease forwards}
+@keyframes scaleOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.92)}}
+.qa-panel .qa-head{padding:14px 16px 10px;border-bottom:1px solid var(--line);
+  background:linear-gradient(90deg,rgba(76,141,255,.10),transparent)}
+.qa-panel .qa-head h4{font-size:14px;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.qa-panel .qa-head .qa-sub{font-size:11.5px;color:var(--muted2)}
+.qa-panel .qa-body{padding:12px 16px}
+.qa-panel .qa-input-wrap{position:relative}
+.qa-panel .qa-input-wrap input{
+  width:100%;padding:10px 36px 10px 14px;font-size:14px;
+  background:#0e141f;border:1px solid var(--line2);border-radius:10px;color:var(--txt);
+}
+.qa-panel .qa-input-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,141,255,.13)}
+.qa-panel .qa-clear-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:transparent;border:0;color:var(--muted2);font-size:16px;cursor:pointer;padding:4px 8px;border-radius:6px}
+.qa-panel .qa-clear-btn:hover{color:var(--txt);background:rgba(255,255,255,.06)}
+.qa-panel .qa-results{max-height:320px;overflow-y:auto;margin-top:8px}
+.qa-panel .qa-result{padding:8px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:10px;
+  font-size:13px;transition:.14s}
+.qa-panel .qa-result:hover,.qa-panel .qa-result.sel{background:rgba(76,141,255,.14)}
+.qa-panel .qa-result .code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted);min-width:52px}
+.qa-panel .qa-result .name{flex:1;font-weight:500}
+.qa-panel .qa-result .tag{font-size:10.5px;padding:2px 7px;border-radius:5px;border:1px solid var(--line2);color:var(--muted2)}
+.qa-panel .qa-result .tag.net{color:#6ee79f;border-color:rgba(34,197,94,.3)}
+.qa-panel .qa-result .tag.have{color:var(--accent);border-color:rgba(76,141,255,.3)}
+.qa-panel .qa-hint{font-size:11px;color:var(--muted2);padding:6px 12px 0;line-height:1.6}
+.qa-panel .qa-hint kbd{display:inline-block;padding:1px 5px;border:1px solid var(--line2);border-radius:4px;
+  background:rgba(255,255,255,.04);font:10px/1.5 ui-monospace,monospace}
+.qa-panel .qa-quick{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0 4px}
+.qa-panel .qa-quick .chip{cursor:pointer;transition:.14s}
+.qa-panel .qa-quick .chip:hover{border-color:var(--accent);color:#cfe1ff}
+.qa-panel .qa-recent{padding:8px 0 4px;border-top:1px dashed var(--line);margin-top:6px}
+.qa-panel .qa-recent .lb{font-size:11px;color:var(--muted2);margin-bottom:6px}
+.qa-panel .qa-recent .chips{display:flex;flex-wrap:wrap;gap:5px}
+.qa-panel .qa-recent .chips .chip{cursor:pointer;transition:.14s}
+.qa-panel .qa-recent .chips .chip:hover{border-color:var(--accent);color:#cfe1ff}
+
+/* ---------- 复盘检查清单 ---------- */
+.checklist{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.cl-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;
+  border:1px solid var(--line);background:rgba(255,255,255,.02);cursor:pointer;transition:.18s}
+.cl-item:hover{border-color:rgba(76,141,255,.3);background:rgba(76,141,255,.04)}
+.cl-item.done{border-color:rgba(34,197,94,.25);background:rgba(34,197,94,.05)}
+.cl-item.done .cl-ic{background:var(--down);border-color:var(--down)}
+.cl-item.done .cl-ic::after{content:"";position:absolute;left:3px;top:0;width:5px;height:9px;
+  border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.cl-item .cl-ic{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line2);
+  flex:0 0 auto;position:relative;transition:.18s}
+.cl-item .cl-txt{font-size:12.5px;color:var(--muted);line-height:1.5}
+.cl-item.done .cl-txt{color:var(--down)}
+
+/* ---------- 快速导航卡片 ---------- */
+.quick-nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.qn-card{padding:14px 16px;border-radius:var(--r);border:1px solid var(--line);background:linear-gradient(160deg,var(--panel2),#141c28);
+  cursor:pointer;transition:.2s;text-decoration:none;display:block}
+.qn-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 16px rgba(76,141,255,.15)}
+.qn-card .qn-ic{font-size:22px;margin-bottom:6px}
+.qn-card .qn-tt{font-size:14px;font-weight:600;color:var(--txt);margin-bottom:2px}
+.qn-card .qn-ds{font-size:11.5px;color:var(--muted2)}
+.qn-card .qn-badge{font-size:11px;color:var(--accent);margin-top:4px}
+
+/* ---------- 今日市场脉搏 ---------- */
+.pulse-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.pulse-cell{padding:10px 14px;border-radius:var(--r);border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.02),transparent)}
+.pulse-cell .pl-lb{font-size:11px;color:var(--muted2);margin-bottom:3px}
+.pulse-cell .pl-vl{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.pulse-cell .pl-ex{font-size:11px;color:var(--muted);margin-top:2px}
+.pulse-cell.up{border-color:rgba(34,197,94,.2)}
+.pulse-cell.up .pl-vl{color:var(--down)}
+.pulse-cell.down{border-color:rgba(255,77,79,.2)}
+.pulse-cell.down .pl-vl{color:var(--up)}
+.pulse-cell.flat .pl-vl{color:var(--muted)}
+.pulse-sec{display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px dashed rgba(38,49,69,.3)}
+.pulse-sec:last-child{border:0}
+.pulse-sec .nm{flex:1}
+.pulse-sec .ch{font-variant-numeric:tabular-nums;font-weight:600}
+.pulse-sec .lb{font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid var(--line2);color:var(--muted2)}
+.pulse-collapsed #pulseBody{display:none}
+.pulse-collapsed #pulseExpand::before{content:"展开 "}
+
+/* ---------- 持仓异动 ---------- */
+.chg-feed{max-height:380px;overflow-y:auto}
+.chg-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;
+  border:1px solid transparent;transition:.14s;cursor:pointer;font-size:13px}
+.chg-row:hover{border-color:var(--line);background:rgba(255,255,255,.02)}
+.chg-row .chg-ic{width:24px;height:24px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.chg-row.sig .chg-ic{background:rgba(76,141,255,.15);color:var(--accent)}
+.chg-row.alert .chg-ic{background:rgba(245,165,36,.15);color:var(--warn)}
+.chg-row.move .chg-ic{background:rgba(255,77,79,.1);color:var(--up)}
+.chg-row .chg-nm{font-weight:600;min-width:80px}
+.chg-row .chg-cd{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--muted);min-width:52px}
+.chg-row .chg-tx{flex:1;color:var(--muted);line-height:1.5}
+.chg-row .chg-dt{font-size:11px;color:var(--muted2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.chg-row .chg-tag{font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--line2);color:var(--muted2)}
+.chg-empty{text-align:center;padding:24px;color:var(--muted2);font-size:13px}
+.chg-tabs{display:flex;gap:6px;margin-bottom:8px}
+.chg-tab{padding:4px 12px;border-radius:6px;border:1px solid var(--line2);background:transparent;
+  color:var(--muted);font-size:12px;cursor:pointer;transition:.14s}
+.chg-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(76,141,255,.08)}
+.chg-tab:hover{border-color:var(--accent)}
+
+/* ---------- 标的分组标签 ---------- */
+.grp-bar{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.grp-chip{padding:4px 12px;border-radius:999px;border:1px solid var(--line2);background:transparent;
+  color:var(--muted);font-size:12px;cursor:pointer;transition:.14s}
+.grp-chip.active{border-color:var(--accent);color:#cfe1ff;background:rgba(76,141,255,.1)}
+.grp-chip:hover{border-color:var(--accent)}
+.grp-chip .cnt{font-size:10px;opacity:.6;margin-left:4px}
+.grp-add{padding:4px 10px;border-radius:999px;border:1px dashed var(--line2);background:transparent;
+  color:var(--muted2);font-size:12px;cursor:pointer;transition:.14s}
+.grp-add:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- 笔记模板 / 笔记卡片 / 复盘模式 ---------- */
+.note-tmpl-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px;
+  padding:8px 10px;border:1px dashed var(--line2);border-radius:8px}
+.note-tmpl{padding:3px 10px;border-radius:6px;border:1px solid var(--line2);background:transparent;
+  color:var(--muted);font-size:12px;cursor:pointer;transition:.14s}
+.note-tmpl:hover{border-color:var(--accent);color:#cfe1ff;background:rgba(76,141,255,.06)}
+.note-tag-filter{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.note-tag-filter .ntf{padding:2px 8px;border-radius:999px;border:1px solid var(--line2);
+  font-size:11px;cursor:pointer;color:var(--muted);transition:.14s}
+.note-tag-filter .ntf.active{border-color:var(--accent);color:#cfe1ff;background:rgba(76,141,255,.1)}
+.note-card{padding:10px 12px;border-radius:8px;border:1px solid var(--line);margin-bottom:8px;
+  transition:.14s}
+.note-card:hover{border-color:var(--line2);background:rgba(255,255,255,.02)}
+.note-card .nc-head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.note-card .nc-title{font-weight:600;font-size:13px;color:var(--txt);flex:1}
+.note-card .nc-code{font-size:11px;color:var(--muted2);font-family:ui-monospace,monospace}
+.note-card .nc-time{font-size:10px;color:var(--muted2);font-variant-numeric:tabular-nums}
+.note-card .nc-body{font-size:12.5px;color:var(--muted);line-height:1.7}
+.note-card .nc-tags{display:flex;gap:4px;margin-top:4px}
+.note-card .nc-tag{font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--line2);color:var(--muted2)}
+.note-card .nc-del{font-size:11px;color:var(--muted2);cursor:pointer;padding:2px 6px;border-radius:4px;
+  border:1px solid transparent;transition:.14s}
+.note-card .nc-del:hover{color:var(--up);border-color:rgba(255,77,79,.3)}
+
+/* ---------- 复盘模式浮层 ---------- */
+.review-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);
+  display:flex;flex-direction:column;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.review-bar{display:flex;align-items:center;gap:10px;padding:12px 20px;
+  background:var(--panel);border-bottom:1px solid var(--line2)}
+.review-bar .rb-title{font-size:15px;font-weight:600;flex:1}
+.review-bar .rb-count{font-size:13px;color:var(--muted)}
+.review-bar button{padding:6px 14px}
+.review-body{flex:1;overflow-y:auto;padding:20px;max-width:1200px;margin:0 auto;width:100%}
+.review-nav{display:flex;justify-content:space-between;align-items:center;padding:10px 0}
+.review-nav .rn-progress{display:flex;gap:3px}
+.review-nav .rn-dot{width:8px;height:8px;border-radius:50%;background:var(--line2);transition:.2s}
+.review-nav .rn-dot.done{background:var(--down)}
+.review-nav .rn-dot.current{background:var(--accent);transform:scale(1.3)}
+.review-content{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:20px}
+.review-empty{text-align:center;padding:40px;color:var(--muted2)}
+.alertrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
+  border:1px solid var(--line);margin-bottom:6px;transition:.14s}
+.alertrow:hover{border-color:var(--line2);background:rgba(255,255,255,.02)}
+.alertrow.hit{border-color:rgba(245,165,36,.3);background:rgba(245,165,36,.04)}
+.alertrow .txt{flex:1}
+.alertrow .tt{font-size:13px;margin-bottom:2px}
+.alertrow .ds{font-size:12px;color:var(--muted)}
+
+/* ---------- 复盘日历热力图 ---------- */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-hd{text-align:center;font-size:11px;color:var(--muted2);padding:2px 0;font-weight:600}
+.cal-cell{aspect-ratio:1;border-radius:4px;border:1px solid rgba(38,49,69,.2);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted2);
+  transition:.14s;position:relative}
+.cal-cell:hover{transform:scale(1.15);z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.cal-cell.today{border-color:var(--accent);border-width:2px}
+.cal-cell.has-data{font-weight:700}
+.cal-cell.empty{opacity:.3;cursor:default}
+.cal-cell.empty:hover{transform:none;box-shadow:none}
+.cal-tooltip{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+  background:var(--panel);border:1px solid var(--line2);border-radius:6px;
+  padding:4px 8px;font-size:11px;white-space:nowrap;z-index:10;display:none;
+  pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.cal-cell:hover .cal-tooltip{display:block}
+
+.journal-box{max-height:500px;overflow-y:auto}
+.journal-entry{padding:12px 0;border-bottom:1px solid var(--line);position:relative;padding-left:20px}
+.journal-entry::before{content:"";position:absolute;left:5px;top:16px;bottom:-12px;width:2px;background:var(--line)}
+.journal-entry:last-child{border:0}
+.journal-entry:last-child::before{display:none}
+.journal-entry .je-dot{position:absolute;left:0;top:14px;width:10px;height:10px;border-radius:50%;
+  border:2px solid var(--accent);background:var(--bg)}
+.journal-entry .je-date{font-size:12px;color:var(--muted2);margin-bottom:4px}
+.journal-entry .je-body{font-size:13px;color:var(--muted);line-height:1.7}
+.journal-entry .je-body b{color:var(--txt)}
+.journal-entry .je-tags{display:flex;gap:4px;margin-top:4px}
+.privacy-banner{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--r2);
+  border:1px solid rgba(245,165,36,.3);background:rgba(245,165,36,.06);margin-bottom:12px}
+.privacy-banner .pb-ic{font-size:20px;flex:0 0 auto}
+.privacy-banner .pb-txt{flex:1;font-size:12.5px;color:#ffd48a;line-height:1.6}
+.privacy-banner .pb-txt b{color:#fff}
+.pubcheck{margin-top:12px}
+.pubcheck .pc-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.pubcheck .pc-row:last-child{border-bottom:0}
+.pubcheck .pc-st{width:18px;height:18px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.pubcheck .pc-st.ok{background:rgba(34,197,94,.15);color:var(--down)}
+.pubcheck .pc-st.no{background:rgba(255,77,79,.15);color:var(--up)}
+.pubcheck .pc-txt{font-size:12.5px;color:var(--muted)}
+.pubcheck .pc-txt b{color:var(--txt)}
+
 @media print{
-  header,nav,.btn,.toolrow{display:none!important}
+  header,nav,.btn,.toolrow,#toastBox,#scrollTop,.shortcut-overlay{display:none!important}
   section{display:block!important}
   body{background:#fff;color:#000}
 }
@@ -513,20 +877,23 @@ details summary:hover{color:var(--txt)}
     <div class="logo">
       <div class="mark">A</div>
       <div>
-        <h1>A股每日复盘分析器 <span class="pbadge ok" style="vertical-align:3px">v2.0</span></h1>
+        <h1>A股每日复盘分析器 <span class="pbadge ok" style="vertical-align:3px">v2.2</span></h1>
         <div class="sub">技术分析版 · 多空信号 · 艾略特波浪 · 短中长三周期</div>
       </div>
     </div>
     <div class="hspacer"></div>
+    <div class="mkt-badge closed" id="mktBadge" title="A股交易时段状态"><span class="dot"></span><span class="lb">休市</span><span class="cd"></span></div>
     <div class="hstat" id="hstat"></div>
-    <div class="flex">
-      <button class="btn" id="btnRefresh" title="浏览器端直连腾讯/东方财富刷新指数与涨跌家数">↻ 刷新行情</button>
+    <div class="flex" style="flex-wrap:nowrap;gap:6px">
+      <button class="btn" id="btnRefresh" title="浏览器端直连腾讯/东方财富刷新指数与涨跌家数">↻ 刷新</button>
       <button class="btn" id="btnExport">导出报告</button>
       <button class="btn" id="btnBackup">备份/恢复</button>
-      <input class="qa" id="topQuick" style="max-width:250px" placeholder="⚡ 加标的：代码 / 拼音 / 名称" title="输入 600519、gmt、茅台 都能搜到，回车即加入">
+      <input class="qa" id="topQuick" style="max-width:220px" placeholder="⚡ 加标的：代码 / 拼音 / 名称" title="输入 600519、gmt、茅台 都能搜到，回车即加入">
       <button class="btn" id="btnSearch" title="快捷搜索（Ctrl / ⌘ + K）">🔍</button>
-      <a class="btn" href="https://pxbo.com" target="_blank" rel="noopener" title="开发者" style="text-decoration:none">🌐 pxbo.com</a>
-      <a class="btn" href="https://github.com/fcgood" target="_blank" rel="noopener" title="GitHub 仓库（Star 支持一下）" style="text-decoration:none">⭐ GitHub</a>
+      <span style="display:inline-flex;gap:4px;white-space:nowrap;align-items:center">
+        <a class="btn" href="https://pxbo.com" target="_blank" rel="noopener" title="开发者" style="text-decoration:none;padding:6px 10px">🌐 pxbo.com</a>
+        <a class="btn" href="https://github.com/fcgood" target="_blank" rel="noopener" title="GitHub 仓库" style="text-decoration:none;padding:6px 10px">⭐ GitHub</a>
+      </span>
     </div>
   </div>
 </header>
@@ -544,6 +911,7 @@ details summary:hover{color:var(--txt)}
     <button data-tab="alerts">⑧ 大事提醒 <span class="navbadge" id="alertBadge" style="display:none">0</span></button>
     <button data-tab="admin">⑨ 数据后台</button>
     <button data-tab="help">关于 / 说明</button>
+    <button id="navShortcut" title="键盘快捷键（按 ? 也可以）" style="font-size:13px;padding:8px 12px">⌨</button>
   </div>
 </nav>
 
@@ -552,6 +920,35 @@ details summary:hover{color:var(--txt)}
 <!-- ============ 仪表盘 ============ -->
 <section id="dash" class="on">
   <div id="guideBox" style="display:none"></div>
+
+  <!-- 今日市场脉搏 -->
+  <div class="card" style="margin-bottom:14px" id="pulseCard">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin:0">📊 今日市场脉搏 <span class="muted" style="font-weight:400;font-size:12px" id="pulseDate"></span></h3>
+      <div style="display:flex;gap:6px">
+        <button class="btn primary sm" id="btnReviewMode" title="逐只过持仓，一屏一只">🎯 复盘模式</button>
+        <button class="btn sm" id="pulseRefresh" title="刷新行情数据">↻ 刷新</button>
+        <button class="btn sm" id="pulseExpand" title="展开/收起">收起</button>
+      </div>
+    </div>
+    <div id="pulseBody"></div>
+  </div>
+
+  <!-- 持仓异动监控 -->
+  <div class="card" style="margin-bottom:14px" id="changeCard">
+    <h3>🔔 持仓异动 <span class="muted" style="font-weight:400;font-size:12px">最近信号 / 价格变动 / 提醒触发</span></h3>
+    <div id="changeBody"></div>
+  </div>
+
+  <!-- 快速导航 -->
+  <div class="quick-nav" id="quickNav"></div>
+
+  <!-- 复盘检查清单 -->
+  <div class="card" style="margin-bottom:14px" id="checklistCard">
+    <h3>📋 今日复盘清单 <span class="muted" style="font-weight:400;font-size:12px">点击勾选，进度自动保存</span></h3>
+    <div class="checklist" id="checklistBox"></div>
+  </div>
+
   <div class="grid g4" style="margin-bottom:14px" id="dashKpi"></div>
 
   <div class="card" style="margin-bottom:14px">
@@ -586,9 +983,44 @@ details summary:hover{color:var(--txt)}
       </div>
     </div>
   </div>
-</section>
 
-<!-- ============ 大盘环境 ============ -->
+  <!-- 复盘日历热力图 -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin:0">📅 复盘日历 <span class="muted" style="font-weight:400;font-size:12px">按日显示组合评分（颜色越深评分越高）</span></h3>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn sm" id="calPrev" title="上一月">←</button>
+        <span id="calLabel" style="font-size:13px;min-width:90px;text-align:center"></span>
+        <button class="btn sm" id="calNext" title="下一月">→</button>
+      </div>
+    </div>
+    <div id="calHeatmap"></div>
+    <div style="display:flex;align-items:center;gap:4px;margin-top:8px;font-size:11px;color:var(--muted2)">
+      <span>低</span>
+      <span style="width:12px;height:12px;border-radius:2px;background:rgba(255,77,79,.35);display:inline-block"></span>
+      <span style="width:12px;height:12px;border-radius:2px;background:rgba(245,165,36,.35);display:inline-block"></span>
+      <span style="width:12px;height:12px;border-radius:2px;background:rgba(76,141,255,.35);display:inline-block"></span>
+      <span style="width:12px;height:12px;border-radius:2px;background:rgba(34,197,94,.35);display:inline-block"></span>
+      <span>高</span>
+      <span style="margin-left:12px">点击日期可查看当日日记</span>
+    </div>
+  </div>
+
+  <!-- 持仓评分雷达图 -->
+  <div class="card" style="margin-bottom:14px" id="radarCard">
+    <h3>🕸 持仓评分雷达 <span class="muted" style="font-weight:400;font-size:12px">多维度对比前 5 只标的</span></h3>
+    <div id="radarChart" style="height:340px"></div>
+  </div>
+
+  <!-- 复盘日记时间线 -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin:0">📔 复盘日记 <span class="muted" style="font-weight:400;font-size:12px">自动记录每日复盘要点</span></h3>
+      <button class="btn sm" id="journalExport">导出日记</button>
+    </div>
+    <div id="journalBox" class="journal-box"></div>
+  </div>
+</section>
 <section id="market">
   <div class="banner info">
     三大指数为 <b>真实快照</b>（<span id="snapDateTxt">—</span> 收盘，本机抓取内嵌）。涨跌家数 / 涨停跌停为实时项，点右上角「↻ 刷新行情」由浏览器直连获取；获取不到则标注"数据缺失"，不编造。
@@ -912,6 +1344,17 @@ details summary:hover{color:var(--txt)}
           <button class="btn sm" id="btnKlSet">⚙ 显示设置</button>
           <button class="btn sm" id="btnPng">导出PNG</button>
           <button class="btn sm" id="btnFull">全屏</button>
+          <div class="sep"></div>
+          <span class="lbl">画线</span>
+          <div class="segpick" id="segDraw">
+            <button data-d="off" class="on">关</button>
+            <button data-d="line" title="趋势线：点击两点画直线">趋势线</button>
+            <button data-d="hline" title="水平线：点击画水平线">水平线</button>
+            <button data-d="channel" title="平行通道：点击三点画通道">通道</button>
+            <button data-d="rect" title="矩形：框选区域">矩形</button>
+            <button data-d="text" title="文字标注：点击位置写文字">文字</button>
+          </div>
+          <button class="btn sm danger" id="btnClearDraw" title="清空当前标的画线">清画线</button>
         </div>
         <!-- K线显示设置面板 -->
         <div id="klSetPanel" style="display:none;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:rgba(255,255,255,.02)">
@@ -1009,6 +1452,35 @@ details summary:hover{color:var(--txt)}
           <div id="diagSeries" style="margin-top:8px;overflow-x:auto"></div>
         </details>
       </div>
+
+      <!-- 该股大事提醒 + 快速操作 -->
+      <div class="card" id="stockAlertCard" style="display:none">
+        <h3>🔔 该股提醒 <span class="muted" style="font-weight:400;font-size:12px">价格触发 / 日期 / 自定义事项</span></h3>
+        <div id="stockAlertList" style="margin-bottom:12px"></div>
+        <div class="flex" style="gap:6px;flex-wrap:wrap">
+          <input id="saPrice" placeholder="价格" style="max-width:80px;font-size:12px" type="number" step="0.01">
+          <select id="saType" style="max-width:100px;font-size:12px">
+            <option value="above">上破</option>
+            <option value="below">下破</option>
+            <option value="chg">日涨跌%</option>
+            <option value="date">日期</option>
+            <option value="note">自定义</option>
+          </select>
+          <input id="saVal" placeholder="值" style="max-width:120px;font-size:12px">
+          <button class="btn primary sm" id="saAdd">+ 添加提醒</button>
+        </div>
+      </div>
+
+      <!-- 该股快速操作 -->
+      <div class="card" id="stockActionCard" style="display:none">
+        <h3>⚡ 快速操作</h3>
+        <div class="flex" style="gap:6px;flex-wrap:wrap">
+          <button class="btn sm" id="saCompare">📊 加入走势对比</button>
+          <button class="btn sm" id="saNote">📝 写笔记</button>
+          <button class="btn sm" id="saReport">📄 纳入复盘报告</button>
+          <button class="btn sm" id="saRefresh">↻ 重新联网拉取</button>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -1017,6 +1489,7 @@ details summary:hover{color:var(--txt)}
 <section id="holdings">
   <div class="card">
     <h3>持仓清单 <span class="muted" style="font-weight:400">勾选"纳入报告"的标的会进入复盘报告</span></h3>
+    <div class="grp-bar" id="grpBar"></div>
     <div class="flex" style="margin-bottom:12px">
       <button class="btn primary sm" id="fetchAll">批量联网拉取持仓行情</button>
       <button class="btn sm" id="resetHold">清空持仓列表</button>
@@ -1099,23 +1572,43 @@ details summary:hover{color:var(--txt)}
 <section id="notes">
   <div class="card">
     <h3>复盘笔记 <span class="muted" style="font-weight:400">记录你的判断与计划，仅存本机浏览器</span></h3>
+
+    <!-- 快速模板 -->
+    <div class="note-tmpl-bar" id="noteTmplBar">
+      <span class="muted" style="font-size:12px;margin-right:4px">模板：</span>
+      <span class="note-tmpl" data-tmpl="watch">👁 观察等待</span>
+      <span class="note-tmpl" data-tmpl="buy">📈 计划买入</span>
+      <span class="note-tmpl" data-tmpl="sell">📉 计划卖出</span>
+      <span class="note-tmpl" data-tmpl="stop">🛑 止损位</span>
+      <span class="note-tmpl" data-tmpl="target">🎯 目标位</span>
+      <span class="note-tmpl" data-tmpl="market">📊 大盘随笔</span>
+    </div>
+
     <div class="grid" style="grid-template-columns:1fr 320px;gap:12px;align-items:start">
       <div>
         <div class="field" style="margin-bottom:8px">
           <label>新建笔记（选择关联标的，可留空写市场随笔）</label>
-          <select id="noteCode" style="margin-bottom:8px"></select>
+          <div class="flex" style="gap:6px;margin-bottom:6px">
+            <select id="noteCode" style="max-width:200px"></select>
+            <input id="noteTitle" placeholder="标题（可选）" style="flex:1;font-size:13px">
+          </div>
           <textarea id="noteText" rows="4" placeholder="例：中兴通讯回踩 MA20 不破且量比回到 1.2 以上再加仓；跌破 30.5 减半仓。"></textarea>
         </div>
-        <div class="flex"><button class="btn primary" id="addNote">保存笔记</button>
-        <button class="btn sm" id="clearNote">清空全部笔记</button>
-        <span class="muted" id="noteMsg"></span></div>
+        <div class="flex" style="gap:6px;align-items:center">
+          <button class="btn primary" id="addNote">保存笔记</button>
+          <span class="muted" style="font-size:12px">标签：</span>
+          <input id="noteTag" placeholder="如 加仓/减仓/观察（可选）" style="max-width:160px;font-size:12px">
+          <button class="btn sm" id="clearNote">清空全部</button>
+          <span class="muted" id="noteMsg"></span>
+        </div>
       </div>
       <div>
         <div class="field" style="margin-bottom:8px">
           <label>筛选</label>
-          <input id="noteFilter" placeholder="按标的名 / 关键词过滤">
+          <input id="noteFilter" placeholder="按标的名 / 关键词 / 标签过滤">
         </div>
-        <div id="noteList" style="max-height:340px;overflow-y:auto"></div>
+        <div class="note-tag-filter" id="noteTagFilter"></div>
+        <div id="noteList" style="max-height:400px;overflow-y:auto"></div>
       </div>
     </div>
   </div>
@@ -1220,18 +1713,18 @@ details summary:hover{color:var(--txt)}
 <!-- ============ 说明 ============ -->
 <section id="help">
   <div class="card">
-    <h3>关于 2.0</h3>
+    <h3>关于 2.1</h3>
     <div class="brand" style="margin-bottom:10px">
       <a href="https://pxbo.com" target="_blank" rel="noopener">🌐 开发者 pxbo.com</a>
       <a href="https://github.com/fcgood" target="_blank" rel="noopener">⭐ GitHub </a>
       <a href="https://github.com/fcgood" target="_blank" rel="noopener">🐛 反馈 / Issue</a>
-      <span class="pbadge ok" id="verBadge">v2.0.0</span>
+      <span class="pbadge ok" id="verBadge">v2.2</span>
     </div>
     <div class="hint" style="font-size:12.5px;line-height:1.9">
       本项目为 <b>纯前端单文件</b> 应用：所有行情计算在浏览器本地完成，<b>不上传任何数据</b>、不接入交易通道、不提供投资建议。
       源码开源可审计，欢迎 Star / Fork / PR。若需商用或二次开发请联系开发者主页。
     </div>
-    <h4 style="font-size:13px;margin:14px 0 6px">2.0 更新日志</h4>
+    <h4 style="font-size:13px;margin:14px 0 6px">更新日志</h4>
     <div class="hint" id="changelog" style="font-size:12.5px;line-height:1.95"></div>
   </div>
   <div class="card">
@@ -1257,13 +1750,46 @@ details summary:hover{color:var(--txt)}
       <b style="color:var(--txt)">6. 走势对比</b>：勾选 2～6 只标的做归一化对比，看区间内的相对强弱、最大回撤、年化波动与收益/回撤比。<br>
       <b style="color:var(--txt)">7. 复盘笔记</b>：按标的记录你的判断与触发计划，存本机浏览器，支持关键词过滤。<br>
       <b style="color:var(--txt)">8. 信号含义</b>：红=多头技术形态，绿=空头技术形态，均为客观形态识别结果，<b>不是买卖指令</b>。<br>
-      <b style="color:var(--txt)">9. 备份</b>：「备份/恢复」可导出/导入全部本地数据 JSON，防清缓存丢失。
+      <b style="color:var(--txt)">9. 备份</b>：「备份/恢复」可导出/导入全部本地数据 JSON，防清缓存丢失。<br>
+      <b style="color:var(--txt)">10. v2.1 新功能</b>：<br>
+      　⌨ <b>快捷键面板</b>：按 <code>?</code> 或点导航栏右侧 ⌨ 按钮查看全部快捷键。<br>
+      　🕐 <b>市场状态</b>：header 实时显示「早盘 / 午休 / 午盘 / 休市 / 周末」并带倒计时。<br>
+      　🍞 <b>Toast 通知</b>：操作反馈不再弹窗，右下角优雅提示带进度条，最多 5 条同屏。<br>
+      　🔖 <b>URL hash 路由</b>：切换标签页时 URL 同步变化，可书签 / 分享直达某个标签页。<br>
+      　⬆ <b>回到顶部</b>：滚动超过 400px 后左下角出现按钮，一键回到顶部。<br>
+      　⌨ <b>g+字母</b>：按 <code>g</code> 后按字母快速跳页（<code>gd</code> 仪表盘 / <code>gm</code> 大盘 / <code>gs</code> 个股 / <code>gh</code> 持仓等）。<br>
+      <b style="color:var(--txt)">11. 进阶功能</b>：<br>
+      　➕ <b>浮动快捷加标的</b>：右下角 + 按钮或 <code>Ctrl+K</code> 任意页面呼出面板，搜索→候选→回车即加→自动拉取，带热门标的与最近添加记录。<br>
+      　🔄 <b>拉取自动重试</b>：联网失败自动重试 2 次 + 指数退避 + 腾讯备用接口兜底 + Toast 反馈。<br>
+      　📋 <b>复盘检查清单</b>：仪表盘 8 步复盘流程，点击勾选并跳转，按日保存进度。<br>
+      　🧭 <b>快速导航卡片</b>：仪表盘直达各功能，显示持仓数 / 信号数 / 笔记数。<br>
+      　📊 <b>今日市场脉搏</b>：仪表盘顶部一屏掌握指数 / 涨跌家数 / 板块 / 资金。<br>
+      　🔔 <b>持仓异动</b>：自动汇总近 3 日信号 / 价格异动 / 提醒触发，点击跳转个股。<br>
+      　📁 <b>标的分组</b>：持仓管理页可按 持仓/观察/题材 分组过滤，自定义新建分组。<br>
+      　📔 <b>复盘日记</b>：一键生成每日日记，记录大盘 / 组合 / 清单进度，时间线回溯。<br>
+      　🔒 <b>隐私发布检查</b>：帮助页 7 项自动检查清单，一键清空个人数据 + 导出安全快照。<br>
+      　⚡ <b>持仓批量操作</b>：批量联网拉取 / 全部纳入报告 / 全部排除 / 清空数据。
     </div>
   </div>
   <div class="card">
     <h3>指标数据字典 <span class="muted" style="font-weight:400;font-size:12px">每个指标是什么、怎么用、有什么坑</span></h3>
     <input id="dictQ" placeholder="搜索指标名称或关键词…" style="max-width:320px;margin-bottom:10px">
     <div id="dictBox"></div>
+  </div>
+  <div class="card">
+    <h3>🔒 隐私与 GitHub 发布</h3>
+    <div class="privacy-banner">
+      <div class="pb-ic">🔐</div>
+      <div class="pb-txt">你的持仓数据仅存于本机浏览器 localStorage，<b>不会上传到任何服务器</b>。
+      发布到 GitHub 前请用下方检查清单确认无隐私泄露。</div>
+    </div>
+    <div class="pubcheck" id="pubCheck"></div>
+    <div class="flex" style="gap:8px;margin-top:14px">
+      <button class="btn primary sm" id="btnPubCheck">🔍 重新检查</button>
+      <button class="btn sm" id="btnExportSafe">📦 导出安全快照（去除个人数据）</button>
+      <button class="btn danger sm" id="btnClearAll">🗑 清空全部个人数据</button>
+    </div>
+    <div class="hint" id="privMsg" style="margin-top:8px;font-size:12.5px"></div>
   </div>
   <div class="card">
     <h3>免责声明</h3>
@@ -1276,11 +1802,31 @@ details summary:hover{color:var(--txt)}
 </section>
 
 <div class="foot">
-  <span>A股每日复盘分析器 <b>v2.0</b> · 数据快照 <span id="footDate">—</span> · ©<a href="https://pxbo.com" target="_blank" rel="noopener">pxbo.com</a></span>
+  <span>A股每日复盘分析器 <b>v2.2</b> · 数据快照 <span id="footDate">—</span> · ©<a href="https://pxbo.com" target="_blank" rel="noopener">pxbo.com</a></span>
 
 </div>
 
 <div id="cmdk" style="display:none"></div>
+
+<!-- Toast 通知容器 -->
+<div id="toastBox"></div>
+
+<!-- 回到顶部按钮 -->
+<button id="scrollTop" title="回到顶部">↑</button>
+
+<!-- 浮动快捷加标按钮 -->
+<button id="fabAdd" title="快捷加标的（Ctrl+K 或点此）">+<span class="fab-badge" id="fabBadge" style="display:none">0</span></button>
+
+<!-- 快捷键帮助面板 -->
+<div class="shortcut-overlay" id="shortcutOverlay" style="display:none">
+  <div class="shortcut-box">
+    <div class="sh">
+      <h3>键盘快捷键</h3>
+      <span class="cls" id="shortcutClose">×</span>
+    </div>
+    <div class="shortcut-grid" id="shortcutGrid"></div>
+  </div>
+</div>
 
 </main>
 

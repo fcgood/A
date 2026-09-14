@@ -474,8 +474,9 @@ function renderDiag(an){
     +'<div class="t2">'+esc(s.ds)+'</div></div></div>').join("")
     :'<div class="empty">近 40 日无技术信号</div>';
 
-  ["diagHead","klineCard","tfCard","detailCard","aiCard"].forEach(id=>{$(id).style.display="";});
+  ["diagHead","klineCard","tfCard","detailCard","aiCard","stockAlertCard","stockActionCard"].forEach(id=>{$(id).style.display="";});
   renderAi(an);
+  if(typeof renderStockAlerts === "function") renderStockAlerts(an.code);
   renderRadar(an);
   renderScoreTrend(an);
   drawKline();
