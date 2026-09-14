@@ -156,7 +156,7 @@ node ../_src/_dbg2.js    # 6 个场景真实 ECharts SSR 渲染校验
 ```
 
 > `python` 若不在 PATH，可用本机托管解释器
-> `C:\Users\FC\.workbuddy\binaries\python\versions\3.13.12\python.exe`。
+
 
 ---
 
